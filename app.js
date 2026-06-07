@@ -504,11 +504,57 @@
     wrap(state.player);
     if (state.player.vx !== 0) state.player.facingFlipped = state.player.vx < 0;
 
+    // Player motion trail (fire) — only when actually moving
+    const psp = Math.hypot(state.player.vx, state.player.vy);
+    if (psp > 50) {
+      const intensity = Math.min(1, psp / 200);
+      const trailCount = (state.powerup && state.powerup.kind === 'power') ? 3 : Math.random() < 0.7 ? 2 : 1;
+      const trailColors = state.powerup && state.powerup.kind === 'power'
+        ? ['#ff6b35', '#ffd54a', '#ff3860']
+        : state.powerup && state.powerup.kind === 'fly'
+        ? ['#5ec3ff', '#a8d8ff', '#fff']
+        : ['#ffd54a', '#ffb347', '#ff6b35'];
+      for (let k = 0; k < trailCount; k++) {
+        if (Math.random() > intensity) continue;
+        const angBehind = Math.atan2(-state.player.vy, -state.player.vx);
+        const spread = (Math.random() - 0.5) * state.player.size * 0.6;
+        const dist = state.player.size * (0.5 + Math.random() * 0.35);
+        const perpX = -Math.sin(angBehind);
+        const perpY = Math.cos(angBehind);
+        state.particles.push({
+          x: state.player.x + Math.cos(angBehind) * dist + perpX * spread,
+          y: state.player.y + Math.sin(angBehind) * dist + perpY * spread,
+          vx: Math.cos(angBehind) * (1.5 + Math.random() * 1.5),
+          vy: Math.sin(angBehind) * (1.5 + Math.random() * 1.5) - 0.2,
+          color: choice(trailColors),
+          life: 380 + Math.random() * 280,
+          size: state.player.size * (0.1 + Math.random() * 0.12),
+          isTrail: true,
+        });
+      }
+    }
+
     // Enemy AI
     for (const o of state.others) {
-      if (o.type === 'dragon') updateDragonAI(o, dt);
-      else if (o.type === 'egg' || o.type === 'math' || o.type === 'powerup') {
-        // small drift for vibe
+      if (o.type === 'dragon') {
+        updateDragonAI(o, dt);
+        // Light sparkle trail for big enemies — tribe-colored
+        const esp = Math.hypot(o.vx, o.vy);
+        if (esp > 30 && o.size > 32 && Math.random() < 0.15) {
+          const pal = (o.character && TRIBES[o.character.tribe]) || TRIBES.SkyWing;
+          const ang = Math.atan2(-o.vy, -o.vx);
+          state.particles.push({
+            x: o.x + Math.cos(ang) * o.size * 0.55,
+            y: o.y + Math.sin(ang) * o.size * 0.55,
+            vx: Math.cos(ang) * 0.6,
+            vy: Math.sin(ang) * 0.6 - 0.1,
+            color: pal.accent,
+            life: 320 + Math.random() * 200,
+            size: o.size * 0.08 + Math.random() * o.size * 0.05,
+            isTrail: true,
+          });
+        }
+      } else if (o.type === 'egg' || o.type === 'math' || o.type === 'powerup') {
         if (o.seed !== undefined) {
           o.y += Math.sin(t / 700 + o.seed) * 0.15;
         }
@@ -560,7 +606,14 @@
       p.life -= 16;
       p.x += p.vx;
       p.y += p.vy;
-      p.vy += 0.15;
+      if (p.isTrail) {
+        // Trail/flame particles drift and slow without falling
+        p.vx *= 0.94;
+        p.vy *= 0.94;
+        p.vy -= 0.04; // slight upward float (like flame)
+      } else {
+        p.vy += 0.15; // burst particles fall like confetti
+      }
       return p.life > 0;
     });
 
@@ -712,12 +765,36 @@
 
   function onMathWrong(o) {
     state.score = Math.max(0, state.score - 10);
-    shrinkPlayer(14);
-    shake(20);
-    burst(o.x, o.y, '#ff3860', 28);
-    state.player.hurtFlash = 30;
+    // Shrink proportionally so it's always meaningful — 25% of current size, min 10
+    const player = state.player;
+    const shrinkBy = Math.max(10, Math.floor(player.size * 0.25));
+    shrinkPlayer(shrinkBy);
+    shake(28);
+    state.player.hurtFlash = 40;
+    // Red burst on the wrong egg
+    burst(o.x, o.y, '#ff3860', 30);
+    burst(o.x, o.y, '#1a0b2e', 18);
+    // Smoke poof around the now-smaller player
+    smokePoof(player.x, player.y, player.size * 1.4);
     flashMathBanner(false);
     clearActiveMath();
+  }
+
+  function smokePoof(x, y, radius) {
+    for (let i = 0; i < 24; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const speed = 0.5 + Math.random() * 2.5;
+      const dist = radius * (0.3 + Math.random() * 0.7);
+      state.particles.push({
+        x: x + Math.cos(a) * dist * 0.2,
+        y: y + Math.sin(a) * dist * 0.2,
+        vx: Math.cos(a) * speed,
+        vy: Math.sin(a) * speed - 1.2,
+        color: choice(['#4a4458', '#2d1654', '#6b1f7a', '#8b8499']),
+        life: 700 + Math.random() * 400,
+        size: 3 + Math.random() * 5,
+      });
+    }
   }
 
   function growPlayer(by) {
@@ -726,7 +803,8 @@
   }
 
   function shrinkPlayer(by) {
-    state.player.size = Math.max(PLAYER_START_SIZE - 4, state.player.size - by);
+    // Floor at 18 so shrinks are always visible (8 less than starting size)
+    state.player.size = Math.max(18, state.player.size - by);
     updateHud();
   }
 
@@ -894,6 +972,23 @@
 
     drawBackground();
 
+    // Trail particles UNDER the dragons (glowing fire/sparkles)
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const p of state.particles) {
+      if (!p.isTrail) continue;
+      const a = Math.max(0, p.life / 600);
+      ctx.globalAlpha = a * 0.85;
+      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 2);
+      grad.addColorStop(0, p.color);
+      grad.addColorStop(1, p.color + '00');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
     // sort by size so smaller draws on top of larger (so you can see your dragon over the big ones)
     const order = [...state.others].sort((a, b) => b.size - a.size);
     for (const o of order) {
@@ -904,8 +999,9 @@
       if (o.size <= state.player.size) drawEntity(o);
     }
 
-    // particles
+    // Burst particles: normal blend ON TOP of entities (confetti-like)
     for (const p of state.particles) {
+      if (p.isTrail) continue;
       ctx.globalAlpha = Math.max(0, p.life / 800);
       ctx.fillStyle = p.color;
       ctx.beginPath();
