@@ -56,37 +56,37 @@
     {
       id: 0, name: 'Sky Kingdom', map: 'sky',
       emoji: '✨', unlockScore: 0,
-      bombsMax: 1, bigChance: 0.45, giantChance: 0.08, speedMult: 1.0,
+      bombsMax: 1, bigChance: 0.55, giantChance: 0.12, speedMult: 1.0,
       description: 'A starlit night sky',
     },
     {
       id: 1, name: 'Rainforest', map: 'forest',
       emoji: '🌳', unlockScore: 50,
-      bombsMax: 1, bigChance: 0.50, giantChance: 0.10, speedMult: 1.05,
+      bombsMax: 1, bigChance: 0.60, giantChance: 0.15, speedMult: 1.05,
       description: 'Mossy trees and falling leaves',
     },
     {
       id: 2, name: 'Sunny Park', map: 'park',
       emoji: '🌼', unlockScore: 120,
-      bombsMax: 2, bigChance: 0.55, giantChance: 0.12, speedMult: 1.1,
+      bombsMax: 2, bigChance: 0.65, giantChance: 0.18, speedMult: 1.1,
       description: 'Grass, daisies, and butterflies',
     },
     {
       id: 3, name: 'Deep Space', map: 'space',
       emoji: '🪐', unlockScore: 250,
-      bombsMax: 2, bigChance: 0.60, giantChance: 0.14, speedMult: 1.15,
+      bombsMax: 2, bigChance: 0.70, giantChance: 0.20, speedMult: 1.15,
       description: 'Stars, nebulae, and floating planets',
     },
     {
       id: 4, name: 'Sky Fire', map: 'volcano',
       emoji: '🔥', unlockScore: 450,
-      bombsMax: 3, bigChance: 0.65, giantChance: 0.16, speedMult: 1.22,
+      bombsMax: 3, bigChance: 0.75, giantChance: 0.22, speedMult: 1.22,
       description: 'Glowing embers and lava streams',
     },
     {
       id: 5, name: 'Ice Kingdom', map: 'arctic',
       emoji: '❄️', unlockScore: 700,
-      bombsMax: 3, bigChance: 0.70, giantChance: 0.18, speedMult: 1.3,
+      bombsMax: 3, bigChance: 0.80, giantChance: 0.25, speedMult: 1.3,
       description: 'Snowfall and crystal frost',
     },
   ];
@@ -215,121 +215,221 @@
       else if (op === '-') { const a = randInt(20, 99), b = randInt(5, a - 1); answer = a - b; problemText = `${a} − ${b} = ?`; }
       else { const a = randInt(2, 10), b = randInt(2, 10); answer = a * b; problemText = `${a} × ${b} = ?`; }
     } else {
-      // genius — Mathcounts countdown / AMC 8-10 style
+      // genius — Mathcounts countdown / AMC 8-10 style. Real bench.
       const kind = choice([
-        'square', 'cube', 'sqrt', 'power2', 'power3',
-        'mult', 'div', 'mult', 'percent', 'percent',
-        'gcf', 'lcm', 'algebra', 'algebra',
-        'factorial', 'choose2', 'sumarith', 'modulo',
-        'mixed', 'mixed', 'fraction',
+        // Harder algebra / number theory / combinatorics (higher weight)
+        'alg2step', 'alg2step', 'alg2step',
+        'sum_sqr', 'sum_cube', 'fib',
+        'factor_count', 'factor_count',
+        'big_mult', 'big_mult',
+        'tri_area', 'rect_area_per',
+        'choose_n', 'choose_n',
+        'compound_pct', 'compound_pct',
+        'mod_chain', 'sum_arith_long',
+        'digit_sum', 'lcm_three',
+        'consec_int',
+        // Mixed-difficulty fallbacks (less weight)
+        'square_big', 'cube', 'power2',
+        'percent', 'gcf', 'lcm', 'factorial', 'mixed',
       ]);
       switch (kind) {
-        case 'square': {
-          const n = randInt(11, 25);
+        // ===== Harder kinds =====
+        case 'alg2step': {
+          // ax + b = cx + d → solve for x
+          let x, a, c, b, d, rhs, lhs;
+          let tries = 0;
+          do {
+            x = randInt(2, 14);
+            a = randInt(3, 12); c = randInt(1, a - 1);
+            b = randInt(2, 30); d = a * x + b - c * x;
+            tries++;
+          } while ((d <= 0 || d > 80) && tries < 8);
+          answer = x;
+          problemText = `${a}x + ${b} = ${c}x + ${d}, x = ?`; break;
+        }
+        case 'sum_sqr': {
+          // 1² + 2² + … + n² = n(n+1)(2n+1)/6
+          const n = randInt(5, 15);
+          answer = n * (n + 1) * (2 * n + 1) / 6;
+          problemText = `1² + 2² + … + ${n}² = ?`; break;
+        }
+        case 'sum_cube': {
+          // 1³ + 2³ + … + n³ = (n(n+1)/2)²
+          const n = randInt(3, 9);
+          const sumN = n * (n + 1) / 2;
+          answer = sumN * sumN;
+          problemText = `1³ + 2³ + … + ${n}³ = ?`; break;
+        }
+        case 'fib': {
+          // nth Fibonacci, 1-indexed F1=1 F2=1
+          const n = randInt(8, 16);
+          let a = 1, b = 1;
+          for (let i = 3; i <= n; i++) { const c = a + b; a = b; b = c; }
+          answer = b;
+          problemText = `F(${n}) in Fibonacci = ?`; break;
+        }
+        case 'factor_count': {
+          // Number of positive divisors of N
+          // Build N with controlled factorization
+          const primes = [2, 3, 5, 7, 11];
+          // exponents tuple
+          const expSets = [[2,1],[3,1],[2,2],[1,1,1],[4,0],[2,0,1],[1,2,0,1]];
+          const exps = choice(expSets);
+          let n = 1;
+          let factorCount = 1;
+          for (let i = 0; i < exps.length && i < primes.length; i++) {
+            n *= Math.pow(primes[i], exps[i]);
+            factorCount *= (exps[i] + 1);
+          }
+          if (n < 12 || n > 600) { // fallback to a simpler one
+            const k = randInt(12, 96);
+            // brute count
+            let cnt = 0;
+            for (let i = 1; i <= k; i++) if (k % i === 0) cnt++;
+            answer = cnt;
+            problemText = `How many positive divisors does ${k} have?`; break;
+          }
+          answer = factorCount;
+          problemText = `How many positive divisors does ${n} have?`; break;
+        }
+        case 'big_mult': {
+          // 2-digit × 2-digit
+          const a = randInt(13, 28), b = randInt(13, 28);
+          answer = a * b;
+          problemText = `${a} × ${b} = ?`; break;
+        }
+        case 'tri_area': {
+          // 1/2 × b × h
+          const baseChoices = [4, 6, 8, 10, 12, 14, 16, 18, 20];
+          const b = choice(baseChoices);
+          const h = randInt(3, 18);
+          answer = (b * h) / 2;
+          // make sure integer
+          if (!Number.isInteger(answer)) { answer = b * h; problemText = `Triangle area = ½ × ${b} × ${h * 2} = ?`; break; }
+          problemText = `Triangle area = ½ × ${b} × ${h} = ?`; break;
+        }
+        case 'rect_area_per': {
+          const w = randInt(4, 18), h = randInt(3, 18);
+          if (Math.random() < 0.5) {
+            answer = w * h;
+            problemText = `Rectangle area, w=${w}, h=${h} = ?`;
+          } else {
+            answer = 2 * (w + h);
+            problemText = `Rectangle perimeter, w=${w}, h=${h} = ?`;
+          }
+          break;
+        }
+        case 'choose_n': {
+          // C(n, k) with k = 2 or 3
+          const k = choice([2, 3]);
+          const n = randInt(k + 2, k === 2 ? 14 : 10);
+          let num = 1, den = 1;
+          for (let i = 0; i < k; i++) { num *= (n - i); den *= (i + 1); }
+          answer = num / den;
+          problemText = `C(${n}, ${k}) = ?`; break;
+        }
+        case 'compound_pct': {
+          // X% of Y% of Z
+          const pcts = [10, 20, 25, 50, 75];
+          const p1 = choice(pcts), p2 = choice(pcts);
+          let z;
+          do { z = randInt(2, 40) * 10; } while (((p1 * p2 * z) % 10000) !== 0);
+          answer = (p1 * p2 * z) / 10000;
+          problemText = `${p1}% of ${p2}% of ${z} = ?`; break;
+        }
+        case 'mod_chain': {
+          // (a × b) mod m
+          const m = randInt(5, 13);
+          const a = randInt(7, 40);
+          const b = randInt(7, 40);
+          answer = (a * b) % m;
+          problemText = `(${a} × ${b}) mod ${m} = ?`; break;
+        }
+        case 'sum_arith_long': {
+          // sum of arithmetic series with non-1 start/step
+          const start = randInt(3, 15);
+          const step = choice([2, 3, 4, 5]);
+          const n = randInt(6, 14);
+          const last = start + step * (n - 1);
+          answer = n * (start + last) / 2;
+          problemText = `${start} + ${start + step} + ${start + 2 * step} + … (${n} terms, +${step}) = ?`; break;
+        }
+        case 'digit_sum': {
+          // sum of digits of N²
+          const k = randInt(13, 49);
+          const sq = k * k;
+          let s = 0; let v = sq;
+          while (v > 0) { s += v % 10; v = Math.floor(v / 10); }
+          answer = s;
+          problemText = `Sum of digits of ${k}² = ?`; break;
+        }
+        case 'lcm_three': {
+          const a = randInt(3, 8), b = randInt(3, 8), c = randInt(3, 8);
+          answer = lcm(lcm(a, b), c);
+          problemText = `LCM(${a}, ${b}, ${c}) = ?`; break;
+        }
+        case 'consec_int': {
+          // sum of n consecutive integers starting at k
+          const n = randInt(5, 12);
+          const k = randInt(2, 25);
+          let s = 0;
+          for (let i = 0; i < n; i++) s += (k + i);
+          answer = s;
+          problemText = `Sum of ${n} consecutive integers starting at ${k} = ?`; break;
+        }
+        // ===== Slightly easier fallbacks (kept for variety) =====
+        case 'square_big': {
+          const n = randInt(15, 32);
           answer = n * n; problemText = `${n}² = ?`; break;
         }
         case 'cube': {
-          const n = randInt(3, 12);
+          const n = randInt(4, 13);
           answer = n * n * n; problemText = `${n}³ = ?`; break;
         }
-        case 'sqrt': {
-          const n = randInt(5, 20);
-          answer = n; problemText = `√${n * n} = ?`; break;
-        }
         case 'power2': {
-          const e = randInt(4, 10);
+          const e = randInt(6, 12);
           answer = Math.pow(2, e); problemText = `2^${e} = ?`; break;
         }
-        case 'power3': {
-          const e = randInt(3, 6);
-          answer = Math.pow(3, e); problemText = `3^${e} = ?`; break;
-        }
-        case 'mult': {
-          const a = randInt(11, 19), b = randInt(6, 19);
-          answer = a * b; problemText = `${a} × ${b} = ?`; break;
-        }
-        case 'div': {
-          const b = randInt(4, 15), q = randInt(6, 25);
-          answer = q; problemText = `${b * q} ÷ ${b} = ?`; break;
-        }
         case 'percent': {
-          const pcts = [10, 15, 20, 25, 30, 40, 50, 60, 75];
+          const pcts = [15, 35, 45, 60, 80];
           const p = choice(pcts);
-          // pick base so answer is whole
           let base;
-          do { base = randInt(2, 20) * 10; } while ((p * base) % 100 !== 0);
+          do { base = randInt(2, 25) * 10; } while ((p * base) % 100 !== 0);
           answer = (p * base) / 100;
           problemText = `${p}% of ${base} = ?`; break;
         }
         case 'gcf': {
-          const x = randInt(2, 12), y = randInt(2, 12);
-          const g = randInt(2, 9);
+          const x = randInt(5, 18), y = randInt(5, 18);
+          const g = randInt(3, 12);
           answer = g * gcd(x, y);
           problemText = `GCF(${g * x}, ${g * y}) = ?`; break;
         }
         case 'lcm': {
-          const a = randInt(3, 10), b = randInt(3, 12);
+          const a = randInt(4, 14), b = randInt(4, 16);
           answer = lcm(a, b);
           problemText = `LCM(${a}, ${b}) = ?`; break;
         }
-        case 'algebra': {
-          // ax + b = c, solve for x
-          const a = randInt(2, 9), x = randInt(2, 12), b = randInt(1, 20);
-          const c = a * x + b;
-          answer = x;
-          problemText = `${a}x + ${b} = ${c}, x = ?`; break;
-        }
         case 'factorial': {
-          const n = randInt(4, 7);
+          const n = randInt(5, 8);
           let f = 1;
           for (let i = 2; i <= n; i++) f *= i;
           answer = f; problemText = `${n}! = ?`; break;
         }
-        case 'choose2': {
-          const n = randInt(4, 12);
-          answer = n * (n - 1) / 2;
-          problemText = `C(${n}, 2) = ?`; break;
-        }
-        case 'sumarith': {
-          // sum of first n positive integers
-          const n = randInt(8, 25);
-          answer = n * (n + 1) / 2;
-          problemText = `1+2+…+${n} = ?`; break;
-        }
-        case 'modulo': {
-          const m = randInt(3, 9);
-          const q = randInt(3, 12);
-          const r = randInt(0, m - 1);
-          answer = r;
-          problemText = `${m * q + r} mod ${m} = ?`; break;
-        }
-        case 'fraction': {
-          // a/b + c/d with common-friendly denominators
-          const denomPair = choice([[2,4],[3,6],[2,6],[3,4],[4,8],[2,3],[3,9],[5,10]]);
-          const [d1, d2] = denomPair;
-          const num1 = randInt(1, d1 - 1), num2 = randInt(1, d2 - 1);
-          const L = lcm(d1, d2);
-          const sumNum = num1 * (L / d1) + num2 * (L / d2);
-          // produce "a/b + c/d × L = ?" — answer is numerator over L when over common denom
-          // simpler: ask sum × L
-          answer = sumNum;
-          problemText = `(${num1}/${d1} + ${num2}/${d2}) × ${L} = ?`; break;
-        }
         case 'mixed': {
-          // order of ops: a × b + c, or a + b × c
-          const a = randInt(2, 12), b = randInt(2, 12), c = randInt(2, 20);
-          if (Math.random() < 0.5) { answer = a * b + c; problemText = `${a} × ${b} + ${c} = ?`; }
-          else { answer = c + a * b; problemText = `${c} + ${a} × ${b} = ?`; }
-          break;
+          // 3-term order of ops
+          const a = randInt(3, 14), b = randInt(3, 14), c = randInt(3, 14), d = randInt(5, 25);
+          answer = a * b + c * d;
+          problemText = `${a} × ${b} + ${c} × ${d} = ?`; break;
         }
       }
     }
 
+    // Wrong-answer tuning — tighter for Genius so you actually have to compute
+    const wrongScale = state.difficulty === 'genius' ? 0.07 : 0.15;
     let wrong;
     let attempts = 0;
     do {
-      // pick a wrong answer that's "near" the right one but believable
-      const range = Math.max(2, Math.floor(Math.abs(answer) * 0.15));
+      const range = Math.max(2, Math.floor(Math.abs(answer) * wrongScale));
       const delta = randInt(-range - 2, range + 2) || 1;
       wrong = answer + delta;
       if (wrong < 0) wrong = answer + Math.abs(delta) + 1;
@@ -595,7 +695,10 @@
       }
     }
 
-    // Collisions
+    // Enemies eat eggs they reach (competing with the player)
+    handleEnemyEggCollisions();
+
+    // Player collisions
     handleCollisions();
 
     // Spawns
@@ -747,16 +850,51 @@
         d.vx = -(dx / dToPlayer) * sp;
         d.vy = -(dy / dToPlayer) * sp;
       } else {
-        const ang = Math.random() * Math.PI * 2;
-        const sp = ENEMY_BASE_SPEED * (0.6 + Math.random() * 0.6) * speedMult;
-        d.vx = Math.cos(ang) * sp;
-        d.vy = Math.sin(ang) * sp;
+        // Look for the nearest egg to compete for — Iris isn't the only hungry dragon
+        let target = null, targetDist = 360;
+        for (const e of state.others) {
+          if (e.type !== 'egg') continue;
+          const ex = e.x - d.x, ey = e.y - d.y;
+          const ed = Math.sqrt(ex * ex + ey * ey);
+          if (ed < targetDist) { target = e; targetDist = ed; }
+        }
+        if (target) {
+          const tx = target.x - d.x, ty = target.y - d.y;
+          const td = Math.sqrt(tx * tx + ty * ty) || 1;
+          const sp = ENEMY_BASE_SPEED * 0.85 * speedMult;
+          d.vx = (tx / td) * sp;
+          d.vy = (ty / td) * sp;
+        } else {
+          const ang = Math.random() * Math.PI * 2;
+          const sp = ENEMY_BASE_SPEED * (0.6 + Math.random() * 0.6) * speedMult;
+          d.vx = Math.cos(ang) * sp;
+          d.vy = Math.sin(ang) * sp;
+        }
       }
     }
     d.x += d.vx * dt;
     d.y += d.vy * dt;
     wrap(d);
     if (d.vx !== 0) d.facingFlipped = d.vx > 0;
+  }
+
+  function handleEnemyEggCollisions() {
+    const eaten = new Set();
+    for (const d of state.others) {
+      if (d.type !== 'dragon') continue;
+      for (const e of state.others) {
+        if (e.type !== 'egg' || eaten.has(e)) continue;
+        const dx = e.x - d.x, dy = e.y - d.y;
+        const dd = Math.sqrt(dx * dx + dy * dy);
+        if (dd < d.size * 0.55 + e.size * 0.6) {
+          eaten.add(e);
+          // enemy grows a little — they're real competitors
+          d.size = Math.min(GIANT_SIZE_MAX, d.size + 1.5);
+          burst(e.x, e.y, '#ffe892', 8);
+        }
+      }
+    }
+    if (eaten.size > 0) state.others = state.others.filter(o => !eaten.has(o));
   }
 
   function handleCollisions() {
@@ -782,15 +920,19 @@
         burst(o.x, o.y, o.kind === 'fly' ? '#5ec3ff' : o.kind === 'power' ? '#ff6b35' : '#ffd54a', 30);
         toRemove.add(o);
       } else if (o.type === 'dragon') {
+        if (flying) {
+          // Fly mode: phase through every dragon — no bounce, no death
+          continue;
+        }
         if (powered || player.size > o.size + EAT_BUFFER) {
           // eat smaller dragon
           eatDragon(o);
           toRemove.add(o);
-        } else if (o.size > player.size + EAT_BUFFER && !flying) {
+        } else if (o.size > player.size + EAT_BUFFER) {
           gameOver(`A bigger ${o.character ? o.character.name : 'dragon'} ate you!`);
           return;
         } else {
-          // bounce
+          // bounce off similarly-sized dragons
           bounce(player, o);
         }
       } else if (o.type === 'bomb') {
