@@ -35,7 +35,13 @@
   const MATH_ANSWER_TIMEOUT_GENIUS_MS = 12000; // countdown round pace
   const POWERUP_INTERVAL_MS = 16000;
   const POWERUP_DURATION_MS = 8000;
-  const GRACE_PERIOD_MS = 8000; // no big dragons until this elapses
+  const GRACE_PERIOD_MS = 8000; // no big dragons / bombs until this elapses
+  const BOMB_SIZE = 30;
+  const BOMB_INTERVAL_MS = 11000;
+  const MAX_BOMBS = 2;
+  const GIANT_CHANCE = 0.12; // post-grace chance an enemy is a giant
+  const GIANT_SIZE_MIN = 120;
+  const GIANT_SIZE_MAX = 175;
 
   // ===== Leaderboard =====
   const LB_KEY = 'dmq_leaderboard_v1';
@@ -340,13 +346,16 @@
     else if (inGrace) {
       // During the grace window: NEVER spawn a dragon bigger than the player
       size = playerSize - randInt(6, 18) - Math.random() * 6;
-    } else if (Math.random() < 0.6) {
-      // After grace: 60% smaller / 40% bigger
+    } else if (Math.random() < GIANT_CHANCE) {
+      // Rare: spawn a GIANT dragon — much bigger than the player, very scary
+      size = GIANT_SIZE_MIN + Math.random() * (GIANT_SIZE_MAX - GIANT_SIZE_MIN);
+    } else if (Math.random() < 0.45) {
+      // 45% smaller, 55% bigger overall after grace — actually challenging
       size = playerSize - randInt(8, 22) - Math.random() * 6;
     } else {
-      size = playerSize + randInt(10, 30) + Math.random() * 10;
+      size = playerSize + randInt(12, 34) + Math.random() * 10;
     }
-    size = Math.max(14, Math.min(180, size));
+    size = Math.max(14, Math.min(GIANT_SIZE_MAX, size));
     const p = randomEmptyPosition(size);
     const ang = Math.random() * Math.PI * 2;
     const speed = ENEMY_BASE_SPEED * (0.7 + Math.random() * 0.7);
@@ -359,6 +368,21 @@
       character,
       turnCooldown: 0,
       facingFlipped: false,
+    });
+  }
+
+  function spawnBomb() {
+    const p = randomEmptyPosition(BOMB_SIZE);
+    if (!p) return;
+    const ang = Math.random() * Math.PI * 2;
+    state.others.push({
+      type: 'bomb',
+      x: p.x, y: p.y,
+      vx: Math.cos(ang) * 35,
+      vy: Math.sin(ang) * 35,
+      size: BOMB_SIZE,
+      bombTurnCooldown: 1500 + Math.random() * 1500,
+      seed: Math.random() * 100,
     });
   }
 
@@ -512,6 +536,8 @@
       if (o.type === 'dragon') {
         updateDragonAI(o, dt);
         emitDragonTrail(o, /*isPlayer*/ false);
+      } else if (o.type === 'bomb') {
+        updateBombAI(o, dt, t);
       } else if (o.type === 'egg' || o.type === 'math' || o.type === 'powerup') {
         if (o.seed !== undefined) {
           o.y += Math.sin(t / 700 + o.seed) * 0.15;
@@ -530,6 +556,16 @@
 
     if (t >= state.nextMathAt) { spawnMath(); state.nextMathAt = t + MATH_INTERVAL_MS; }
     if (t >= state.nextPowerupAt) { spawnPowerup(); state.nextPowerupAt = t + POWERUP_INTERVAL_MS; }
+
+    // Bombs — only after grace, capped at MAX_BOMBS
+    if (t > state.graceUntil) {
+      if (!state.nextBombAt) state.nextBombAt = t + 6000;
+      const bombCount = state.others.filter(o => o.type === 'bomb').length;
+      if (t >= state.nextBombAt && bombCount < MAX_BOMBS) {
+        spawnBomb();
+        state.nextBombAt = t + BOMB_INTERVAL_MS;
+      }
+    }
 
     // Math timeout — faster for Genius (Mathcounts countdown pace)
     if (state.activeMath) {
@@ -610,6 +646,33 @@
     p.targetVy = ty;
   }
 
+  function updateBombAI(b, dt, t) {
+    b.bombTurnCooldown -= dt * 1000;
+    if (b.bombTurnCooldown <= 0) {
+      b.bombTurnCooldown = 1800 + Math.random() * 2000;
+      const ang = Math.random() * Math.PI * 2;
+      const speed = 30 + Math.random() * 25;
+      b.vx = Math.cos(ang) * speed;
+      b.vy = Math.sin(ang) * speed;
+    }
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    wrap(b);
+    // Tiny ember trail
+    if (Math.random() < 0.25) {
+      state.particles.push({
+        x: b.x + (Math.random() - 0.5) * b.size * 0.6,
+        y: b.y - b.size * 1.0 + (Math.random() - 0.5) * 6,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: -0.8 - Math.random() * 0.5,
+        color: choice(['#ff6b35', '#ffd54a', '#ff3860']),
+        life: 280 + Math.random() * 200,
+        size: 2 + Math.random() * 2,
+        isTrail: true,
+      });
+    }
+  }
+
   function updateDragonAI(d, dt) {
     d.turnCooldown -= dt * 1000;
     const player = state.player;
@@ -681,6 +744,15 @@
           // bounce
           bounce(player, o);
         }
+      } else if (o.type === 'bomb') {
+        if (flying) {
+          // phase through bombs while flying — bomb still alive
+          continue;
+        }
+        bombExplode(o);
+        toRemove.add(o);
+        gameOver('💣 You hit a bomb!');
+        return;
       }
     }
 
@@ -736,6 +808,14 @@
     smokePoof(player.x, player.y, player.size * 1.4);
     flashMathBanner(false);
     clearActiveMath();
+  }
+
+  function bombExplode(b) {
+    shake(40);
+    burst(b.x, b.y, '#ff3860', 50);
+    burst(b.x, b.y, '#ffd54a', 35);
+    burst(b.x, b.y, '#ff6b35', 35);
+    burst(b.x, b.y, '#1a0b2e', 25);
   }
 
   function smokePoof(x, y, radius) {
@@ -1031,6 +1111,78 @@
     else if (o.type === 'egg') drawEgg(o);
     else if (o.type === 'math') drawMathEgg(o);
     else if (o.type === 'powerup') drawPowerup(o);
+    else if (o.type === 'bomb') drawBomb(o);
+  }
+
+  function drawBomb(o) {
+    const t = performance.now();
+    const pulse = 1 + Math.sin(t / 200) * 0.15;
+    const cx = o.x, cy = o.y + Math.sin(t / 400 + o.seed) * 2;
+    const r = o.size;
+
+    // Danger red glow
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 2.6 * pulse);
+    glow.addColorStop(0, 'rgba(255, 56, 96, 0.6)');
+    glow.addColorStop(1, 'rgba(255, 56, 96, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 2.6 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bomb body (dark sphere)
+    const bodyGrad = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.25, r * 0.15, cx, cy + r * 0.1, r);
+    bodyGrad.addColorStop(0, '#4a4458');
+    bodyGrad.addColorStop(0.55, '#1f1a2e');
+    bodyGrad.addColorStop(1, '#0a0414');
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy + r * 0.05, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body highlight
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.beginPath();
+    ctx.ellipse(cx - r * 0.35, cy - r * 0.25, r * 0.28, r * 0.18, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Fuse holder (small brass cylinder on top)
+    ctx.fillStyle = '#5a4030';
+    ctx.fillRect(cx - r * 0.18, cy - r * 1.05, r * 0.36, r * 0.28);
+    ctx.fillStyle = '#7a5a40';
+    ctx.fillRect(cx - r * 0.18, cy - r * 1.05, r * 0.36, r * 0.08);
+
+    // Fuse curve
+    ctx.strokeStyle = '#a08866';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r * 0.95);
+    ctx.quadraticCurveTo(cx + r * 0.5, cy - r * 1.5, cx + r * 0.25, cy - r * 1.75);
+    ctx.stroke();
+
+    // Sparkly fuse tip
+    const tipX = cx + r * 0.25;
+    const tipY = cy - r * 1.75;
+    const sparkleSize = 6 + Math.sin(t / 90) * 3;
+    const sparkleGlow = ctx.createRadialGradient(tipX, tipY, 0, tipX, tipY, sparkleSize * 2.2);
+    sparkleGlow.addColorStop(0, 'rgba(255, 213, 74, 0.95)');
+    sparkleGlow.addColorStop(0.5, 'rgba(255, 107, 53, 0.6)');
+    sparkleGlow.addColorStop(1, 'rgba(255, 107, 53, 0)');
+    ctx.fillStyle = sparkleGlow;
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, sparkleSize * 2.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, sparkleSize * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Skull mark on the bomb body
+    ctx.fillStyle = '#ff3860';
+    ctx.font = `bold ${Math.floor(r * 0.95)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('💀', cx, cy + r * 0.15);
   }
 
   function drawDragonEntity(o, isPlayer) {
@@ -1080,9 +1232,23 @@
       const aspect = img.naturalWidth / img.naturalHeight;
       let w = o.size * 2.2, h = w / aspect;
       if (h > o.size * 2.2) { h = o.size * 2.2; w = h * aspect; }
+
+      // Tilt the dragon toward its movement direction (capped to ±36°)
+      const speed = Math.hypot(o.vx, o.vy);
+      let tilt = 0;
+      if (speed > 25) {
+        tilt = (o.vy / speed) * (Math.PI / 5); // ~36° max
+        tilt = Math.max(-Math.PI / 5, Math.min(Math.PI / 5, tilt));
+      }
+      const targetTilt = o.facingFlipped ? -tilt : tilt;
+      // Smooth the tilt so it doesn't snap
+      if (o.renderTilt === undefined) o.renderTilt = 0;
+      o.renderTilt += (targetTilt - o.renderTilt) * 0.18;
+
       ctx.save();
       ctx.translate(o.x, o.y);
       if (o.facingFlipped) ctx.scale(-1, 1);
+      ctx.rotate(o.renderTilt);
       ctx.drawImage(img, -w / 2, -h / 2, w, h);
       ctx.restore();
     } else {
