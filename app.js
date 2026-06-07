@@ -1,65 +1,65 @@
 // Iris Juliet's Dragon Math Quest
-// A snake-style adventure where a Wings of Fire dragon eats eggs, smaller
-// dragons, and solves math problems to level up.
+// A Wings of Fire-themed .io-style growing dragon game with math challenges.
+// Single player dragon grows as it eats eggs and smaller dragons. Avoid bigger
+// dragons (unless you have Power mode). Math problems appear and the right
+// answer makes you level up.
 
 (() => {
   'use strict';
 
-  // ===== Tribe palette (Wings of Fire inspired) =====
-  const TRIBES = {
-    SkyWing:   { main: '#C8102E', accent: '#ffb347', eye: '#ffd54a' },
-    SeaWing:   { main: '#1E3A8A', accent: '#5ec3ff', eye: '#7ed957' },
-    NightWing: { main: '#2D1B4E', accent: '#b266ff', eye: '#ffd54a' },
-    RainWing:  { main: '#2E8B57', accent: '#ff4f8b', eye: '#ffd54a' },
-    SandWing:  { main: '#B8851E', accent: '#fff4d1', eye: '#000' },
-    IceWing:   { main: '#a8d8ff', accent: '#ffffff', eye: '#5ec3ff' },
-    MudWing:   { main: '#8B4513', accent: '#d4a017', eye: '#fff' },
-    SilkWing:  { main: '#b266ff', accent: '#ffd54a', eye: '#fff' },
-  };
-  const TRIBE_NAMES = Object.keys(TRIBES);
+  // ===== Internal play-field coordinates (logical pixels) =====
+  const PLAY_W = 1200;
+  const PLAY_H = 720;
 
-  // ===== Constants =====
-  const GRID_COLS = 28;
-  const GRID_ROWS = 20;
-  const TICK_BASE_MS = 130;   // base tick speed
-  const TICK_MIN_MS  = 70;    // fastest the dragon will go
+  // ===== Sizes =====
+  const PLAYER_START_SIZE = 28;
+  const PLAYER_MAX_SIZE = 220;
+  const EGG_SIZE = 18;
+  const MATH_EGG_SIZE = 26;
+  const POWERUP_SIZE = 26;
+  const EAT_BUFFER = 6; // need to be > target.size + EAT_BUFFER bigger to eat them
 
-  const START_LENGTH = 4;
-  const MAX_EGGS = 6;
-  const MAX_MINI_DRAGONS = 3;
-  const MAX_BIG_DRAGONS = 2;
+  // ===== Speeds (px / sec) =====
+  const PLAYER_BASE_SPEED = 220;
+  const PLAYER_MIN_SPEED = 130;
+  const ENEMY_BASE_SPEED = 80;
 
-  const SPAWN_BIG_AT_LENGTH = 8;
-  const SPAWN_BIG_INTERVAL_MS = 12000;
+  // ===== Spawn counts =====
+  const MAX_EGGS = 10;
+  const MAX_OTHER_DRAGONS = 6;
 
-  const MATH_FIRST_DELAY_MS = 8000;
-  const MATH_INTERVAL_MS = 16000;
-  const MATH_ANSWER_TIMEOUT_MS = 22000; // answer eggs disappear after this
-
-  const POWERUP_INTERVAL_MS = 18000;
+  // ===== Timings (ms) =====
+  const MATH_FIRST_DELAY_MS = 7000;
+  const MATH_INTERVAL_MS = 14000;
+  const MATH_ANSWER_TIMEOUT_MS = 22000;
+  const POWERUP_INTERVAL_MS = 16000;
   const POWERUP_DURATION_MS = 8000;
+
+  // ===== Leaderboard =====
+  const LB_KEY = 'dmq_leaderboard_v1';
+  const LB_NAME_KEY = 'dmq_player_name';
+  const LB_SIZE = 10;
 
   // ===== State =====
   const state = {
     difficulty: 'hard',
+    chosenCharIndex: 0, // index into the PLAYER_CHARS roster
     running: false,
     paused: false,
     score: 0,
     level: 1,
-    best: Number(localStorage.getItem('dmq_best') || 0),
-    dragon: null,        // {body: [{c,r}], dir:{dc,dr}, nextDir, tribe, length}
-    eggs: [],            // [{c,r,kind:'egg'|'mini'|'big'|'fly'|'power'|'levelup'|'math', value?:number, correct?:bool, tribe?:string}]
-    bigDragons: [],      // [{path:[{c,r}], dir:{dc,dr}, tribe, length}]
+    player: null,         // {x,y,vx,vy,targetVx,targetVy,size,character}
+    others: [],           // dragons + eggs + math eggs + power-ups
     particles: [],
-    activeMath: null,    // {problem, answer, eggs:[id,id]}
-    powerup: null,       // {kind:'fly'|'power', endsAt}
-    tickMs: TICK_BASE_MS,
-    lastTickAt: 0,
-    nextBigSpawnAt: 0,
+    activeMath: null,     // {problemText, answer, ids:[]}
+    powerup: null,        // {kind:'fly'|'power', endsAt}
+    lastFrame: 0,
     nextMathAt: 0,
     nextPowerupAt: 0,
     rafId: null,
     screenShake: 0,
+    keys: new Set(),
+    touch: null,          // {x,y} target in world coords
   };
 
   // ===== DOM =====
@@ -74,7 +74,7 @@
   const previewCtx = previewCanvas.getContext('2d');
 
   const hudScore = $('hud-score');
-  const hudLength = $('hud-length');
+  const hudSize = $('hud-length');
   const hudLevel = $('hud-level');
   const hudBest = $('hud-best');
   const mathBanner = $('math-banner');
@@ -84,74 +84,81 @@
   const powerupText = $('powerup-text');
   const powerupTimer = $('powerup-timer');
 
-  // ===== Sizing =====
-  let cellSize = 24;
-  function sizeCanvas() {
-    const wrap = canvas.parentElement;
-    const cssWidth = Math.min(wrap.clientWidth, 900);
-    cellSize = Math.floor(cssWidth / GRID_COLS);
-    const cssHeight = cellSize * GRID_ROWS;
-    const dpr = window.devicePixelRatio || 1;
-    canvas.style.width = (cellSize * GRID_COLS) + 'px';
-    canvas.style.height = cssHeight + 'px';
-    canvas.width  = Math.floor(cellSize * GRID_COLS * dpr);
-    canvas.height = Math.floor(cssHeight * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // ===== Characters =====
+  // Loaded from characters.json (curated copy from the coloring guide).
+  let CHARACTERS = [];
+  let CHARACTERS_WITH_IMG = [];
+  const PLAYER_CHARS_NAMES = ['Clay', 'Tsunami', 'Glory', 'Starflight', 'Sunny', 'Peril', 'Moonwatcher', 'Qibli'];
+  let PLAYER_CHARS = [];
+  const imgCache = new Map();
+
+  // Tribe fallback palette for any character that has no image
+  const TRIBES = {
+    SkyWing:   { main: '#C8102E', accent: '#ffb347', eye: '#ffd54a' },
+    SeaWing:   { main: '#1E3A8A', accent: '#5ec3ff', eye: '#7ed957' },
+    NightWing: { main: '#2D1B4E', accent: '#b266ff', eye: '#ffd54a' },
+    RainWing:  { main: '#2E8B57', accent: '#ff4f8b', eye: '#ffd54a' },
+    SandWing:  { main: '#B8851E', accent: '#fff4d1', eye: '#000' },
+    IceWing:   { main: '#a8d8ff', accent: '#ffffff', eye: '#5ec3ff' },
+    MudWing:   { main: '#8B4513', accent: '#d4a017', eye: '#fff' },
+    SilkWing:  { main: '#b266ff', accent: '#ffd54a', eye: '#fff' },
+    HiveWing:  { main: '#C26200', accent: '#ffd54a', eye: '#000' },
+    LeafWing:  { main: '#228B22', accent: '#90ee90', eye: '#ffd54a' },
+  };
+
+  function loadImage(url) {
+    if (!url) return null;
+    if (imgCache.has(url)) return imgCache.get(url);
+    const img = new Image();
+    img.src = url;
+    imgCache.set(url, img);
+    return img;
   }
 
-  // ===== Difficulty / math =====
-  function pickDifficulty(d) {
-    state.difficulty = d;
-    document.querySelectorAll('.diff-btn').forEach(b => {
-      const isSel = b.dataset.diff === d;
-      b.classList.toggle('selected', isSel);
-      b.setAttribute('aria-checked', String(isSel));
-    });
+  async function loadCharacters() {
+    try {
+      const res = await fetch('characters.json');
+      CHARACTERS = await res.json();
+    } catch (e) {
+      console.warn('Could not load characters.json — using fallback');
+      CHARACTERS = [];
+    }
+    CHARACTERS_WITH_IMG = CHARACTERS.filter(c => c.image);
+    PLAYER_CHARS = PLAYER_CHARS_NAMES
+      .map(n => CHARACTERS.find(c => c.name === n))
+      .filter(Boolean);
+    if (PLAYER_CHARS.length === 0 && CHARACTERS_WITH_IMG.length > 0) {
+      PLAYER_CHARS = CHARACTERS_WITH_IMG.slice(0, 8);
+    }
+    // Preload player & a sample of enemies so first paint is smooth
+    for (const c of PLAYER_CHARS) loadImage(c.image);
+    for (const c of CHARACTERS_WITH_IMG.slice(0, 30)) loadImage(c.image);
+    renderPlayerPicker();
   }
 
+  // ===== Math problem generator =====
   function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
   function choice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
   function makeMathProblem() {
     const d = state.difficulty;
-    let a, b, op, answer, problemText;
+    let a, b, op, answer;
 
     if (d === 'easy') {
       op = choice(['+', '-']);
-      if (op === '+') {
-        a = randInt(0, 9); b = randInt(0, 10 - a);
-        answer = a + b;
-      } else {
-        a = randInt(2, 10); b = randInt(0, a);
-        answer = a - b;
-      }
+      if (op === '+') { a = randInt(0, 9); b = randInt(0, 10 - a); answer = a + b; }
+      else { a = randInt(2, 10); b = randInt(0, a); answer = a - b; }
     } else if (d === 'medium') {
       op = choice(['+', '-']);
-      if (op === '+') {
-        a = randInt(2, 18); b = randInt(1, 20 - a);
-        answer = a + b;
-      } else {
-        a = randInt(5, 20); b = randInt(1, a);
-        answer = a - b;
-      }
+      if (op === '+') { a = randInt(2, 18); b = randInt(1, 20 - a); answer = a + b; }
+      else { a = randInt(5, 20); b = randInt(1, a); answer = a - b; }
     } else {
-      // hard: within 100 + times tables
       op = choice(['+', '-', '×', '×']);
-      if (op === '+') {
-        a = randInt(15, 80); b = randInt(10, 100 - a);
-        answer = a + b;
-      } else if (op === '-') {
-        a = randInt(20, 99); b = randInt(5, a - 1);
-        answer = a - b;
-      } else {
-        a = randInt(2, 10); b = randInt(2, 10);
-        answer = a * b;
-      }
+      if (op === '+') { a = randInt(15, 80); b = randInt(10, 100 - a); answer = a + b; }
+      else if (op === '-') { a = randInt(20, 99); b = randInt(5, a - 1); answer = a - b; }
+      else { a = randInt(2, 10); b = randInt(2, 10); answer = a * b; }
     }
 
-    problemText = `${a} ${op} ${b} = ?`;
-
-    // wrong answer: nearby but not equal
     let wrong;
     let attempts = 0;
     do {
@@ -162,140 +169,174 @@
     } while (wrong === answer && attempts < 10);
     if (wrong === answer) wrong = answer + 1;
 
-    return { problemText, answer, wrong };
+    return { problemText: `${a} ${op} ${b} = ?`, answer, wrong };
   }
 
-  // ===== Grid helpers =====
-  function cellOccupied(c, r) {
-    if (state.dragon) {
-      for (const seg of state.dragon.body) if (seg.c === c && seg.r === r) return true;
-    }
-    for (const e of state.eggs) if (e.c === c && e.r === r) return true;
-    for (const bd of state.bigDragons) {
-      for (const seg of bd.path) if (seg.c === c && seg.r === r) return true;
-    }
-    return false;
+  // ===== Canvas sizing =====
+  function sizeCanvas() {
+    const wrap = canvas.parentElement;
+    const cssW = Math.min(wrap.clientWidth, 1100);
+    const cssH = cssW * (PLAY_H / PLAY_W);
+    const dpr = window.devicePixelRatio || 1;
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+    canvas.width = Math.floor(cssW * dpr);
+    canvas.height = Math.floor(cssH * dpr);
+    // Render in PLAY_W × PLAY_H coordinate space; scale by ratio
+    const sx = (cssW * dpr) / PLAY_W;
+    const sy = (cssH * dpr) / PLAY_H;
+    ctx.setTransform(sx, 0, 0, sy, 0, 0);
   }
 
-  function randomEmptyCell() {
-    for (let i = 0; i < 200; i++) {
-      const c = randInt(1, GRID_COLS - 2);
-      const r = randInt(1, GRID_ROWS - 2);
-      if (!cellOccupied(c, r)) return { c, r };
+  // ===== Spawn helpers =====
+  function randomEmptyPosition(size) {
+    for (let i = 0; i < 60; i++) {
+      const x = randInt(size, PLAY_W - size);
+      const y = randInt(size, PLAY_H - size);
+      // avoid spawning right on top of the player
+      if (state.player) {
+        const d = dist({ x, y }, state.player);
+        if (d < state.player.size + size + 100) continue;
+      }
+      return { x, y };
     }
-    return null;
+    return { x: randInt(50, PLAY_W - 50), y: randInt(50, PLAY_H - 50) };
   }
 
-  // ===== Spawning =====
   function spawnEgg() {
-    const cell = randomEmptyCell();
-    if (!cell) return;
-    state.eggs.push({ ...cell, kind: 'egg' });
+    const p = randomEmptyPosition(EGG_SIZE);
+    state.others.push({
+      type: 'egg',
+      x: p.x, y: p.y, vx: 0, vy: 0,
+      size: EGG_SIZE,
+      seed: Math.random() * 100,
+    });
   }
 
-  function spawnMiniDragon() {
-    const cell = randomEmptyCell();
-    if (!cell) return;
-    state.eggs.push({ ...cell, kind: 'mini', tribe: choice(TRIBE_NAMES) });
-  }
-
-  function spawnBigDragon() {
-    const start = randomEmptyCell();
-    if (!start) return;
-    const path = [];
-    const len = 5;
-    for (let i = 0; i < len; i++) path.push({ ...start });
-    const dirs = [{dc:1,dr:0},{dc:-1,dr:0},{dc:0,dr:1},{dc:0,dr:-1}];
-    state.bigDragons.push({
-      path,
-      dir: choice(dirs),
-      tribe: choice(TRIBE_NAMES),
-      moveCounter: 0,
+  function spawnDragon(forceSize = null) {
+    if (CHARACTERS.length === 0) return;
+    const character = choice(CHARACTERS_WITH_IMG.length > 0 ? CHARACTERS_WITH_IMG : CHARACTERS);
+    // 60% smaller-than-player, 40% bigger — gives the player breathing room
+    const playerSize = state.player ? state.player.size : PLAYER_START_SIZE;
+    let size;
+    if (forceSize) size = forceSize;
+    else if (Math.random() < 0.6) size = playerSize - randInt(8, 22) - Math.random() * 6;
+    else size = playerSize + randInt(10, 30) + Math.random() * 10;
+    size = Math.max(16, Math.min(180, size));
+    const p = randomEmptyPosition(size);
+    const ang = Math.random() * Math.PI * 2;
+    const speed = ENEMY_BASE_SPEED * (0.7 + Math.random() * 0.7);
+    state.others.push({
+      type: 'dragon',
+      x: p.x, y: p.y,
+      vx: Math.cos(ang) * speed,
+      vy: Math.sin(ang) * speed,
+      size,
+      character,
+      turnCooldown: 0,
+      facingFlipped: false,
     });
   }
 
   function spawnPowerup() {
-    const kind = choice(['fly', 'power', 'levelup']);
-    const cell = randomEmptyCell();
-    if (!cell) return;
-    state.eggs.push({ ...cell, kind });
+    const kinds = ['fly', 'power', 'levelup'];
+    const kind = choice(kinds);
+    const p = randomEmptyPosition(POWERUP_SIZE);
+    state.others.push({
+      type: 'powerup',
+      kind,
+      x: p.x, y: p.y, vx: 0, vy: 0,
+      size: POWERUP_SIZE,
+      seed: Math.random() * 100,
+    });
   }
 
-  function spawnMathAnswers() {
+  function spawnMath() {
     if (state.activeMath) return;
     const mp = makeMathProblem();
-    const correctCell = randomEmptyCell();
-    if (!correctCell) return;
-    const wrongCell = randomEmptyCell();
-    if (!wrongCell) return;
-
-    const correctEgg = { ...correctCell, kind: 'math', value: mp.answer, correct: true, spawnedAt: performance.now() };
-    const wrongEgg   = { ...wrongCell,   kind: 'math', value: mp.wrong,  correct: false, spawnedAt: performance.now() };
-    state.eggs.push(correctEgg, wrongEgg);
-
-    state.activeMath = { problemText: mp.problemText, answer: mp.answer, eggs: [correctEgg, wrongEgg] };
+    const p1 = randomEmptyPosition(MATH_EGG_SIZE);
+    const p2 = randomEmptyPosition(MATH_EGG_SIZE);
+    const correct = {
+      type: 'math', value: mp.answer, correct: true,
+      x: p1.x, y: p1.y, vx: 0, vy: 0,
+      size: MATH_EGG_SIZE, seed: Math.random() * 100,
+      spawnedAt: performance.now(),
+    };
+    const wrong = {
+      type: 'math', value: mp.wrong, correct: false,
+      x: p2.x, y: p2.y, vx: 0, vy: 0,
+      size: MATH_EGG_SIZE, seed: Math.random() * 100,
+      spawnedAt: performance.now(),
+    };
+    state.others.push(correct, wrong);
+    state.activeMath = { problemText: mp.problemText, answer: mp.answer, eggs: [correct, wrong] };
     mathProblem.textContent = mp.problemText;
     mathBanner.classList.remove('hidden');
   }
 
   function clearActiveMath() {
     if (!state.activeMath) return;
-    state.eggs = state.eggs.filter(e => e.kind !== 'math');
+    state.others = state.others.filter(o => o.type !== 'math');
     state.activeMath = null;
     mathBanner.classList.add('hidden');
   }
 
-  // ===== Dragon control =====
-  function setDir(dc, dr) {
-    if (!state.dragon) return;
-    const cur = state.dragon.dir;
-    // disallow 180° reversal
-    if (cur.dc === -dc && cur.dr === -dr) return;
-    state.dragon.nextDir = { dc, dr };
+  // ===== Geometry =====
+  function dist(a, b) {
+    const dx = a.x - b.x, dy = a.y - b.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function wrap(e) {
+    if (e.x < -e.size) e.x = PLAY_W + e.size;
+    if (e.x > PLAY_W + e.size) e.x = -e.size;
+    if (e.y < -e.size) e.y = PLAY_H + e.size;
+    if (e.y > PLAY_H + e.size) e.y = -e.size;
   }
 
   // ===== Game start =====
   function startGame() {
-    sizeCanvas();
     state.running = true;
     state.paused = false;
     state.score = 0;
     state.level = 1;
-    state.eggs = [];
-    state.bigDragons = [];
+    state.others = [];
     state.particles = [];
     state.activeMath = null;
     state.powerup = null;
-    state.tickMs = TICK_BASE_MS;
     state.screenShake = 0;
     mathBanner.classList.add('hidden');
     powerupBanner.classList.add('hidden');
 
-    const startC = Math.floor(GRID_COLS / 3);
-    const startR = Math.floor(GRID_ROWS / 2);
-    const body = [];
-    for (let i = 0; i < START_LENGTH; i++) body.push({ c: startC - i, r: startR });
-    state.dragon = {
-      body,
-      dir: { dc: 1, dr: 0 },
-      nextDir: { dc: 1, dr: 0 },
-      tribe: 'SkyWing',
-      length: START_LENGTH,
-      hurt: 0,
+    const char = PLAYER_CHARS[state.chosenCharIndex] || PLAYER_CHARS[0] || CHARACTERS_WITH_IMG[0];
+    state.player = {
+      x: PLAY_W / 2,
+      y: PLAY_H / 2,
+      vx: 0, vy: 0,
+      targetVx: 0, targetVy: 0,
+      size: PLAYER_START_SIZE,
+      character: char,
+      facingFlipped: false,
+      hurtFlash: 0,
     };
 
-    // seed eggs
-    for (let i = 0; i < 5; i++) spawnEgg();
-    spawnMiniDragon();
+    for (let i = 0; i < 10; i++) spawnEgg();
+    // Friendly start: 4 smaller dragons + 1 bigger one (far away thanks to randomEmptyPosition spacing)
+    for (let i = 0; i < 4; i++) {
+      const size = PLAYER_START_SIZE - 8 - Math.random() * 6;
+      spawnDragon(Math.max(16, size));
+    }
+    spawnDragon(PLAYER_START_SIZE + 18 + Math.random() * 14);
 
     const now = performance.now();
-    state.nextBigSpawnAt = now + 6000;
     state.nextMathAt = now + MATH_FIRST_DELAY_MS;
     state.nextPowerupAt = now + POWERUP_INTERVAL_MS;
-    state.lastTickAt = now;
+    state.lastFrame = now;
 
     showScreen('game-screen');
-    hudBest.textContent = state.best;
+    // Size canvas AFTER game-screen becomes visible so clientWidth is correct
+    sizeCanvas();
+    hudBest.textContent = getTopScore();
     updateHud();
 
     cancelAnimationFrame(state.rafId);
@@ -310,9 +351,8 @@
 
   function updateHud() {
     hudScore.textContent = state.score;
-    hudLength.textContent = state.dragon ? state.dragon.length : 0;
+    hudSize.textContent = state.player ? Math.round(state.player.size) : 0;
     hudLevel.textContent = state.level;
-    hudBest.textContent = state.best;
   }
 
   // ===== Main loop =====
@@ -320,43 +360,49 @@
     if (!state.running) return;
     if (state.paused) { state.rafId = requestAnimationFrame(loop); return; }
 
-    // Tick dragon
-    if (t - state.lastTickAt >= state.tickMs) {
-      tickDragon();
-      state.lastTickAt = t;
+    const dt = Math.min(0.05, (t - state.lastFrame) / 1000);
+    state.lastFrame = t;
+
+    // Player control
+    updatePlayerDirection();
+    const speed = Math.max(PLAYER_MIN_SPEED, PLAYER_BASE_SPEED - (state.player.size - PLAYER_START_SIZE) * 0.4);
+    // smooth velocity toward target
+    const targetVx = state.player.targetVx * speed;
+    const targetVy = state.player.targetVy * speed;
+    state.player.vx += (targetVx - state.player.vx) * 0.18;
+    state.player.vy += (targetVy - state.player.vy) * 0.18;
+    state.player.x += state.player.vx * dt;
+    state.player.y += state.player.vy * dt;
+    wrap(state.player);
+    if (state.player.vx !== 0) state.player.facingFlipped = state.player.vx < 0;
+
+    // Enemy AI
+    for (const o of state.others) {
+      if (o.type === 'dragon') updateDragonAI(o, dt);
+      else if (o.type === 'egg' || o.type === 'math' || o.type === 'powerup') {
+        // small drift for vibe
+        if (o.seed !== undefined) {
+          o.y += Math.sin(t / 700 + o.seed) * 0.15;
+        }
+      }
     }
 
-    // Big dragons move slower (every other tick-ish)
-    state.bigDragons.forEach(bd => {
-      bd.moveCounter = (bd.moveCounter || 0) + (t - (bd._lastT || t));
-      bd._lastT = t;
-      if (bd.moveCounter >= state.tickMs * 1.6) {
-        moveBigDragon(bd);
-        bd.moveCounter = 0;
-      }
-    });
+    // Collisions
+    handleCollisions();
 
     // Spawns
-    if (t >= state.nextBigSpawnAt && state.dragon.length >= SPAWN_BIG_AT_LENGTH && state.bigDragons.length < MAX_BIG_DRAGONS) {
-      spawnBigDragon();
-      state.nextBigSpawnAt = t + SPAWN_BIG_INTERVAL_MS;
-    }
-    if (state.eggs.filter(e => e.kind === 'egg').length < 4) spawnEgg();
-    if (state.eggs.filter(e => e.kind === 'mini').length < 1 && state.dragon.length >= 6) spawnMiniDragon();
+    const eggCount = state.others.filter(o => o.type === 'egg').length;
+    if (eggCount < MAX_EGGS) spawnEgg();
+    const dragonCount = state.others.filter(o => o.type === 'dragon').length;
+    if (dragonCount < MAX_OTHER_DRAGONS) spawnDragon();
 
-    if (t >= state.nextMathAt) {
-      spawnMathAnswers();
-      state.nextMathAt = t + MATH_INTERVAL_MS;
-    }
-    if (t >= state.nextPowerupAt) {
-      spawnPowerup();
-      state.nextPowerupAt = t + POWERUP_INTERVAL_MS;
-    }
+    if (t >= state.nextMathAt) { spawnMath(); state.nextMathAt = t + MATH_INTERVAL_MS; }
+    if (t >= state.nextPowerupAt) { spawnPowerup(); state.nextPowerupAt = t + POWERUP_INTERVAL_MS; }
 
-    // Expire math after timeout
+    // Math timeout
     if (state.activeMath) {
-      const age = t - state.activeMath.eggs[0].spawnedAt;
-      if (age > MATH_ANSWER_TIMEOUT_MS) clearActiveMath();
+      const e0 = state.activeMath.eggs[0];
+      if (e0 && t - e0.spawnedAt > MATH_ANSWER_TIMEOUT_MS) clearActiveMath();
     }
 
     // Power-up countdown
@@ -370,157 +416,188 @@
       }
     }
 
-    // particles
+    // Particles
     state.particles = state.particles.filter(p => {
       p.life -= 16;
       p.x += p.vx;
       p.y += p.vy;
-      p.vy += 0.08;
+      p.vy += 0.15;
       return p.life > 0;
     });
 
     if (state.screenShake > 0) state.screenShake = Math.max(0, state.screenShake - 1);
+    if (state.player.hurtFlash > 0) state.player.hurtFlash = Math.max(0, state.player.hurtFlash - 1);
 
     render();
     state.rafId = requestAnimationFrame(loop);
   }
 
-  function tickDragon() {
-    const d = state.dragon;
-    d.dir = d.nextDir;
-    const head = d.body[0];
-    const newHead = { c: head.c + d.dir.dc, r: head.r + d.dir.dr };
+  function updatePlayerDirection() {
+    const p = state.player;
+    let tx = 0, ty = 0;
+    if (state.keys.has('ArrowUp') || state.keys.has('w') || state.keys.has('W')) ty -= 1;
+    if (state.keys.has('ArrowDown') || state.keys.has('s') || state.keys.has('S')) ty += 1;
+    if (state.keys.has('ArrowLeft') || state.keys.has('a') || state.keys.has('A')) tx -= 1;
+    if (state.keys.has('ArrowRight') || state.keys.has('d') || state.keys.has('D')) tx += 1;
 
-    // wall collision
-    if (newHead.c < 0 || newHead.c >= GRID_COLS || newHead.r < 0 || newHead.r >= GRID_ROWS) {
-      return gameOver('You flew into the wall!');
-    }
-
-    // self collision
-    for (let i = 0; i < d.body.length - 1; i++) {
-      if (d.body[i].c === newHead.c && d.body[i].r === newHead.r) {
-        return gameOver('You bit your own tail!');
+    if (state.touch) {
+      const dx = state.touch.x - p.x;
+      const dy = state.touch.y - p.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d > 15) {
+        tx = dx / d;
+        ty = dy / d;
+      } else {
+        tx = 0; ty = 0;
       }
     }
 
-    // big dragon collision
+    if (tx !== 0 && ty !== 0) {
+      const inv = 1 / Math.sqrt(2);
+      tx *= inv; ty *= inv;
+    }
+    p.targetVx = tx;
+    p.targetVy = ty;
+  }
+
+  function updateDragonAI(d, dt) {
+    d.turnCooldown -= dt * 1000;
+    const player = state.player;
+    const dx = player.x - d.x;
+    const dy = player.y - d.y;
+    const dToPlayer = Math.sqrt(dx * dx + dy * dy);
+
+    const biggerThanPlayer = d.size > player.size + EAT_BUFFER;
+    const smallerThanPlayer = d.size + EAT_BUFFER < player.size;
+    const powered = state.powerup && state.powerup.kind === 'power';
+
+    if (d.turnCooldown <= 0) {
+      d.turnCooldown = 700 + Math.random() * 800;
+      // Bigger dragons only notice and chase when close — gives Iris breathing room
+      if (biggerThanPlayer && !powered && dToPlayer < 220) {
+        const sp = ENEMY_BASE_SPEED * 0.75;
+        d.vx = (dx / dToPlayer) * sp;
+        d.vy = (dy / dToPlayer) * sp;
+      } else if ((smallerThanPlayer || powered) && dToPlayer < 280) {
+        // Smaller dragons flee
+        const sp = ENEMY_BASE_SPEED * 1.05;
+        d.vx = -(dx / dToPlayer) * sp;
+        d.vy = -(dy / dToPlayer) * sp;
+      } else {
+        // wander
+        const ang = Math.random() * Math.PI * 2;
+        const sp = ENEMY_BASE_SPEED * (0.6 + Math.random() * 0.6);
+        d.vx = Math.cos(ang) * sp;
+        d.vy = Math.sin(ang) * sp;
+      }
+    }
+    d.x += d.vx * dt;
+    d.y += d.vy * dt;
+    wrap(d);
+    if (d.vx !== 0) d.facingFlipped = d.vx < 0;
+  }
+
+  function handleCollisions() {
+    const player = state.player;
     const flying = state.powerup && state.powerup.kind === 'fly';
     const powered = state.powerup && state.powerup.kind === 'power';
-    for (const bd of state.bigDragons) {
-      const collided = bd.path.some(seg => seg.c === newHead.c && seg.r === newHead.r);
-      if (collided) {
-        if (powered) {
-          // EAT the big dragon!
-          devourBigDragon(bd, newHead);
-          break;
-        } else if (!flying) {
-          return gameOver('A bigger dragon got you!');
+
+    const toRemove = new Set();
+
+    for (let i = 0; i < state.others.length; i++) {
+      const o = state.others[i];
+      const d = dist(player, o);
+      if (d > player.size * 0.6 + o.size * 0.6) continue;
+
+      if (o.type === 'egg') {
+        eatEgg(o);
+        toRemove.add(o);
+      } else if (o.type === 'math') {
+        if (o.correct) onMathRight(o); else onMathWrong(o);
+        toRemove.add(o);
+      } else if (o.type === 'powerup') {
+        activatePowerup(o.kind);
+        burst(o.x, o.y, o.kind === 'fly' ? '#5ec3ff' : o.kind === 'power' ? '#ff6b35' : '#ffd54a', 30);
+        toRemove.add(o);
+      } else if (o.type === 'dragon') {
+        if (powered || player.size > o.size + EAT_BUFFER) {
+          // eat smaller dragon
+          eatDragon(o);
+          toRemove.add(o);
+        } else if (o.size > player.size + EAT_BUFFER && !flying) {
+          gameOver(`A bigger ${o.character ? o.character.name : 'dragon'} ate you!`);
+          return;
+        } else {
+          // bounce
+          bounce(player, o);
         }
       }
     }
 
-    // egg/food collision
-    let ate = null;
-    state.eggs = state.eggs.filter(e => {
-      if (e.c === newHead.c && e.r === newHead.r) { ate = e; return false; }
-      return true;
-    });
+    if (toRemove.size > 0) state.others = state.others.filter(o => !toRemove.has(o));
+  }
 
-    d.body.unshift(newHead);
-    let grew = false;
+  function bounce(p, o) {
+    const dx = p.x - o.x;
+    const dy = p.y - o.y;
+    const d = Math.sqrt(dx * dx + dy * dy) || 1;
+    const nx = dx / d, ny = dy / d;
+    p.x = o.x + nx * (p.size * 0.6 + o.size * 0.6 + 1);
+    p.y = o.y + ny * (p.size * 0.6 + o.size * 0.6 + 1);
+    p.vx += nx * 60; p.vy += ny * 60;
+  }
 
-    if (ate) {
-      onEat(ate, newHead);
-      grew = true;
-      // some foods grow more
-      if (ate.kind === 'mini') {
-        // grow extra 1
-        d.length += 1;
-      } else if (ate.kind === 'levelup') {
-        d.length += 3;
-        for (let i = 0; i < 3; i++) d.body.push({ ...d.body[d.body.length - 1] });
-      } else if (ate.kind === 'math' && ate.correct) {
-        d.length += 2;
-        d.body.push({ ...d.body[d.body.length - 1] });
-      }
-    }
+  function eatEgg(o) {
+    state.score += 5;
+    growPlayer(2);
+    burst(o.x, o.y, '#ffe892', 14);
+  }
 
-    if (!grew) {
-      d.body.pop();
-    } else {
-      d.length = d.body.length;
-    }
+  function eatDragon(o) {
+    state.score += Math.floor(20 + o.size);
+    growPlayer(Math.max(4, o.size * 0.18));
+    const tribeColor = o.character && TRIBES[o.character.tribe] ? TRIBES[o.character.tribe].main : '#ff6b35';
+    burst(o.x, o.y, tribeColor, 30);
+    burst(o.x, o.y, '#fff4d1', 12);
+  }
 
-    // Speed scales with length
-    state.tickMs = Math.max(TICK_MIN_MS, TICK_BASE_MS - (d.length - START_LENGTH) * 1.6);
+  function onMathRight(o) {
+    state.score += 60;
+    state.level += 1;
+    growPlayer(12);
+    burst(o.x, o.y, '#ffd54a', 35);
+    burst(o.x, o.y, '#b266ff', 22);
+    flashMathBanner(true);
+    clearActiveMath();
+  }
 
+  function onMathWrong(o) {
+    state.score = Math.max(0, state.score - 10);
+    shrinkPlayer(14);
+    shake(20);
+    burst(o.x, o.y, '#ff3860', 28);
+    state.player.hurtFlash = 30;
+    flashMathBanner(false);
+    clearActiveMath();
+  }
+
+  function growPlayer(by) {
+    state.player.size = Math.min(PLAYER_MAX_SIZE, state.player.size + by);
     updateHud();
   }
 
-  function devourBigDragon(bd, headPos) {
-    state.score += 100;
-    state.dragon.length += 5;
-    for (let i = 0; i < 5; i++) state.dragon.body.push({ ...state.dragon.body[state.dragon.body.length - 1] });
-    burst(headPos.c, headPos.r, TRIBES[bd.tribe].main, 40);
-    burst(headPos.c, headPos.r, '#fff', 20);
-    state.bigDragons = state.bigDragons.filter(x => x !== bd);
-  }
-
-  function onEat(e, headPos) {
-    const px = headPos.c, py = headPos.r;
-    switch (e.kind) {
-      case 'egg':
-        state.score += 5;
-        burst(px, py, '#ffe892', 12);
-        break;
-      case 'mini': {
-        state.score += 15;
-        const col = TRIBES[e.tribe] ? TRIBES[e.tribe].main : '#ff6b35';
-        burst(px, py, col, 18);
-        break;
-      }
-      case 'math': {
-        if (e.correct) {
-          state.score += 50;
-          state.level += 1;
-          burst(px, py, '#ffd54a', 30);
-          burst(px, py, '#b266ff', 20);
-          flashMathBanner(true);
-        } else {
-          // wrong! shrink + lose points
-          state.score = Math.max(0, state.score - 10);
-          shrinkDragon(2);
-          shake(20);
-          burst(px, py, '#ff3860', 25);
-          flashMathBanner(false);
-        }
-        clearActiveMath();
-        break;
-      }
-      case 'fly':
-        activatePowerup('fly');
-        burst(px, py, '#5ec3ff', 25);
-        break;
-      case 'power':
-        activatePowerup('power');
-        burst(px, py, '#ff6b35', 25);
-        break;
-      case 'levelup':
-        state.score += 25;
-        state.level += 1;
-        burst(px, py, '#ffd54a', 28);
-        burst(px, py, '#ff6b35', 18);
-        break;
-    }
-  }
-
-  function shrinkDragon(by) {
-    const d = state.dragon;
-    for (let i = 0; i < by && d.body.length > 2; i++) d.body.pop();
-    d.length = d.body.length;
+  function shrinkPlayer(by) {
+    state.player.size = Math.max(PLAYER_START_SIZE - 4, state.player.size - by);
+    updateHud();
   }
 
   function activatePowerup(kind) {
+    if (kind === 'levelup') {
+      state.score += 30;
+      state.level += 1;
+      growPlayer(15);
+      return;
+    }
     state.powerup = { kind, endsAt: performance.now() + POWERUP_DURATION_MS };
     powerupIcon.textContent = kind === 'fly' ? '✨' : '🔥';
     powerupText.textContent = kind === 'fly' ? 'FLY MODE' : 'POWER MODE';
@@ -538,52 +615,19 @@
     }, 250);
   }
 
-  function shake(amount) { state.screenShake = Math.max(state.screenShake, amount); }
+  function shake(a) { state.screenShake = Math.max(state.screenShake, a); }
 
-  function moveBigDragon(bd) {
-    const head = bd.path[0];
-    const dragonHead = state.dragon.body[0];
-
-    // 70% chase the player, 30% random — but flip direction if blocked
-    let dir = bd.dir;
-    if (Math.random() < 0.7) {
-      const dx = Math.sign(dragonHead.c - head.c);
-      const dy = Math.sign(dragonHead.r - head.r);
-      if (Math.abs(dragonHead.c - head.c) > Math.abs(dragonHead.r - head.r)) {
-        if (dx !== 0) dir = { dc: dx, dr: 0 };
-      } else {
-        if (dy !== 0) dir = { dc: 0, dr: dy };
-      }
-    } else if (Math.random() < 0.3) {
-      const dirs = [{dc:1,dr:0},{dc:-1,dr:0},{dc:0,dr:1},{dc:0,dr:-1}];
-      dir = choice(dirs);
-    }
-
-    let newHead = { c: head.c + dir.dc, r: head.r + dir.dr };
-    if (newHead.c < 0 || newHead.c >= GRID_COLS || newHead.r < 0 || newHead.r >= GRID_ROWS) {
-      // bounce
-      dir = { dc: -dir.dc, dr: -dir.dr };
-      newHead = { c: head.c + dir.dc, r: head.r + dir.dr };
-    }
-    bd.dir = dir;
-    bd.path.unshift(newHead);
-    bd.path.pop();
-  }
-
-  // ===== Particles =====
-  function burst(c, r, color, count) {
-    const cx = (c + 0.5) * cellSize;
-    const cy = (r + 0.5) * cellSize;
+  function burst(x, y, color, count) {
     for (let i = 0; i < count; i++) {
       const a = Math.random() * Math.PI * 2;
-      const speed = 1 + Math.random() * 3;
+      const speed = 1 + Math.random() * 4;
       state.particles.push({
-        x: cx, y: cy,
+        x, y,
         vx: Math.cos(a) * speed,
-        vy: Math.sin(a) * speed - 1,
+        vy: Math.sin(a) * speed - 1.5,
         color,
         life: 600 + Math.random() * 300,
-        size: 2 + Math.random() * 3,
+        size: 2 + Math.random() * 4,
       });
     }
   }
@@ -592,44 +636,134 @@
   function gameOver(reason) {
     state.running = false;
     cancelAnimationFrame(state.rafId);
-    const isBest = state.score > state.best;
-    if (isBest) {
-      state.best = state.score;
-      localStorage.setItem('dmq_best', String(state.best));
-    }
 
     $('gameover-msg').textContent = reason;
     $('final-score').textContent = state.score;
-    $('final-length').textContent = state.dragon.length;
+    $('final-length').textContent = Math.round(state.player.size);
     $('final-level').textContent = state.level;
-    $('final-best').textContent = state.best;
-    $('new-best').classList.toggle('hidden', !isBest);
+
+    const qualifies = qualifiesForLeaderboard(state.score);
+    const nameRow = $('lb-name-row');
+    const newBest = $('new-best');
+    if (qualifies) {
+      newBest.classList.remove('hidden');
+      newBest.textContent = '🏆 New high score!';
+      nameRow.classList.remove('hidden');
+      const lastName = localStorage.getItem(LB_NAME_KEY) || 'Iris';
+      $('lb-name-input').value = lastName;
+    } else {
+      newBest.classList.add('hidden');
+      nameRow.classList.add('hidden');
+    }
+
+    renderLeaderboard($('gameover-leaderboard'), null);
     gameoverScreen.classList.add('active');
+  }
+
+  function submitLeaderboard() {
+    const name = ($('lb-name-input').value || 'Dragon').trim().slice(0, 16) || 'Dragon';
+    localStorage.setItem(LB_NAME_KEY, name);
+    const entry = {
+      name,
+      score: state.score,
+      size: Math.round(state.player.size),
+      level: state.level,
+      difficulty: state.difficulty,
+      ts: Date.now(),
+    };
+    const lb = readLeaderboard();
+    lb.push(entry);
+    lb.sort((a, b) => b.score - a.score);
+    while (lb.length > LB_SIZE) lb.pop();
+    localStorage.setItem(LB_KEY, JSON.stringify(lb));
+    $('lb-name-row').classList.add('hidden');
+    renderLeaderboard($('gameover-leaderboard'), entry);
+    renderStartLeaderboard();
+    hudBest.textContent = getTopScore();
+  }
+
+  function readLeaderboard() {
+    try {
+      const raw = localStorage.getItem(LB_KEY);
+      if (!raw) return [];
+      const lb = JSON.parse(raw);
+      return Array.isArray(lb) ? lb : [];
+    } catch { return []; }
+  }
+
+  function getTopScore() {
+    const lb = readLeaderboard();
+    return lb.length > 0 ? lb[0].score : 0;
+  }
+
+  function qualifiesForLeaderboard(score) {
+    if (score <= 0) return false;
+    const lb = readLeaderboard();
+    if (lb.length < LB_SIZE) return true;
+    return score > lb[lb.length - 1].score;
+  }
+
+  function renderLeaderboard(container, highlight) {
+    const lb = readLeaderboard();
+    if (lb.length === 0) {
+      container.innerHTML = '<p class="lb-empty">No scores yet — be the first dragon!</p>';
+      return;
+    }
+    const rows = lb.map((e, i) => {
+      const isHi = highlight && e.ts === highlight.ts;
+      return `<li class="lb-row${isHi ? ' lb-highlight' : ''}">
+        <span class="lb-rank">${i + 1}</span>
+        <span class="lb-name">${escapeHtml(e.name)}</span>
+        <span class="lb-score">${e.score}</span>
+        <span class="lb-meta">${e.difficulty[0].toUpperCase() + e.difficulty.slice(1)}</span>
+      </li>`;
+    }).join('');
+    container.innerHTML = `<ol class="lb-list">${rows}</ol>`;
+  }
+
+  function renderStartLeaderboard() {
+    const c = $('start-leaderboard');
+    if (!c) return;
+    const lb = readLeaderboard().slice(0, 5);
+    if (lb.length === 0) {
+      c.innerHTML = '<p class="lb-empty">No scores yet — go make history!</p>';
+      return;
+    }
+    c.innerHTML = `<ol class="lb-list">${lb.map((e, i) => `
+      <li class="lb-row">
+        <span class="lb-rank">${i + 1}</span>
+        <span class="lb-name">${escapeHtml(e.name)}</span>
+        <span class="lb-score">${e.score}</span>
+        <span class="lb-meta">${e.difficulty[0].toUpperCase() + e.difficulty.slice(1)}</span>
+      </li>`).join('')}</ol>`;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   }
 
   // ===== Rendering =====
   function render() {
-    const W = cellSize * GRID_COLS;
-    const H = cellSize * GRID_ROWS;
     ctx.save();
     if (state.screenShake > 0) {
       ctx.translate(
-        (Math.random() - 0.5) * state.screenShake * 0.3,
-        (Math.random() - 0.5) * state.screenShake * 0.3,
+        (Math.random() - 0.5) * state.screenShake * 0.6,
+        (Math.random() - 0.5) * state.screenShake * 0.6,
       );
     }
-    ctx.clearRect(0, 0, W, H);
+    ctx.clearRect(0, 0, PLAY_W, PLAY_H);
 
-    drawGridBg(W, H);
+    drawBackground();
 
-    // eggs / food
-    for (const e of state.eggs) drawFood(e);
-
-    // big dragons
-    for (const bd of state.bigDragons) drawBigDragon(bd);
-
-    // player dragon
-    drawDragon(state.dragon);
+    // sort by size so smaller draws on top of larger (so you can see your dragon over the big ones)
+    const order = [...state.others].sort((a, b) => b.size - a.size);
+    for (const o of order) {
+      if (o.size > state.player.size) drawEntity(o);
+    }
+    drawEntity(state.player);
+    for (const o of order) {
+      if (o.size <= state.player.size) drawEntity(o);
+    }
 
     // particles
     for (const p of state.particles) {
@@ -644,431 +778,231 @@
     ctx.restore();
   }
 
-  function drawGridBg(W, H) {
-    // soft grid dots
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
-    for (let c = 0; c < GRID_COLS; c++) {
-      for (let r = 0; r < GRID_ROWS; r++) {
-        ctx.beginPath();
-        ctx.arc((c + 0.5) * cellSize, (r + 0.5) * cellSize, 1, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-  }
-
-  function drawFood(e) {
-    const cx = (e.c + 0.5) * cellSize;
-    const cy = (e.r + 0.5) * cellSize;
+  function drawBackground() {
+    // Stars / sparkles
     const t = performance.now() / 1000;
-    const bob = Math.sin(t * 3 + e.c + e.r) * 1.5;
-
-    if (e.kind === 'egg') {
-      drawEgg(cx, cy + bob, cellSize * 0.42, '#fff4d1', '#ffe892');
-    } else if (e.kind === 'mini') {
-      drawMiniDragon(cx, cy + bob, cellSize * 0.5, TRIBES[e.tribe], t);
-    } else if (e.kind === 'math') {
-      drawMathEgg(cx, cy + bob, cellSize * 0.46, e.value, e.correct);
-    } else if (e.kind === 'fly') {
-      drawPowerup(cx, cy + bob, cellSize * 0.45, '✨', '#5ec3ff');
-    } else if (e.kind === 'power') {
-      drawPowerup(cx, cy + bob, cellSize * 0.45, '🔥', '#ff6b35');
-    } else if (e.kind === 'levelup') {
-      drawPowerup(cx, cy + bob, cellSize * 0.45, '⭐', '#ffd54a');
+    for (let i = 0; i < 40; i++) {
+      const x = ((i * 137.5) % PLAY_W);
+      const y = ((i * 97.3) % PLAY_H);
+      const tw = 0.4 + 0.6 * Math.abs(Math.sin(t + i * 0.7));
+      ctx.globalAlpha = 0.4 * tw;
+      ctx.fillStyle = '#fff4d1';
+      ctx.beginPath();
+      ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+      ctx.fill();
     }
+    ctx.globalAlpha = 1;
   }
 
-  function drawEgg(cx, cy, r, fill, shine) {
+  function drawEntity(o) {
+    if (o === state.player) drawDragonEntity(o, true);
+    else if (o.type === 'dragon') drawDragonEntity(o, false);
+    else if (o.type === 'egg') drawEgg(o);
+    else if (o.type === 'math') drawMathEgg(o);
+    else if (o.type === 'powerup') drawPowerup(o);
+  }
+
+  function drawDragonEntity(o, isPlayer) {
+    const c = o.character;
+    const img = c && c.image ? loadImage(c.image) : null;
+    const flying = isPlayer && state.powerup && state.powerup.kind === 'fly';
+    const powered = isPlayer && state.powerup && state.powerup.kind === 'power';
+
+    ctx.save();
+
+    // Drop shadow / glow
+    if (isPlayer) {
+      const glow = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.size * 1.6);
+      const glowCol = powered ? 'rgba(255, 107, 53, 0.55)' : flying ? 'rgba(94, 195, 255, 0.55)' : 'rgba(255, 213, 74, 0.5)';
+      glow.addColorStop(0, glowCol);
+      glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, o.size * 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+      ctx.beginPath();
+      ctx.ellipse(o.x, o.y + o.size * 0.55, o.size * 0.7, o.size * 0.18, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (flying) ctx.globalAlpha = 0.6;
+
+    if (img && img.complete && img.naturalWidth > 0) {
+      // Image draw — keep aspect ratio, fit inside bounding circle
+      const aspect = img.naturalWidth / img.naturalHeight;
+      let w = o.size * 2.2, h = w / aspect;
+      if (h > o.size * 2.2) { h = o.size * 2.2; w = h * aspect; }
+      ctx.save();
+      ctx.translate(o.x, o.y);
+      if (o.facingFlipped) ctx.scale(-1, 1);
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      ctx.restore();
+    } else {
+      // Fallback: tribe gradient blob
+      drawDragonFallback(o);
+    }
+
+    // Name label for enemies (only if bigger threshold so it's not cluttered)
+    if (!isPlayer && c && o.size > 28) {
+      ctx.font = `${Math.max(10, Math.min(16, o.size * 0.2))}px -apple-system, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      const isBigger = o.size > state.player.size + EAT_BUFFER;
+      ctx.fillStyle = isBigger ? '#ff3860' : '#fff4d1';
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.lineWidth = 3;
+      const label = c.name;
+      const ly = o.y + o.size * 0.95;
+      ctx.strokeText(label, o.x, ly);
+      ctx.fillText(label, o.x, ly);
+    }
+
+    if (isPlayer && state.player.hurtFlash > 0) {
+      ctx.globalAlpha = state.player.hurtFlash / 30;
+      ctx.fillStyle = '#ff3860';
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, o.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  function drawDragonFallback(o) {
+    const pal = (o.character && TRIBES[o.character.tribe]) || TRIBES.SkyWing;
+    const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.size);
+    g.addColorStop(0, pal.accent);
+    g.addColorStop(0.6, pal.main);
+    g.addColorStop(1, '#1a0b2e');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(o.x, o.y, o.size, 0, Math.PI * 2);
+    ctx.fill();
+    // eye
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.arc(o.x + o.size * 0.3, o.y - o.size * 0.2, o.size * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(o.x + o.size * 0.35, o.y - o.size * 0.2, o.size * 0.07, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawEgg(o) {
+    const bob = Math.sin(performance.now() / 600 + o.seed) * 2;
+    const cx = o.x, cy = o.y + bob;
+    const r = o.size;
     // glow
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 2.2);
-    grad.addColorStop(0, 'rgba(255, 232, 146, 0.4)');
+    grad.addColorStop(0, 'rgba(255, 232, 146, 0.5)');
     grad.addColorStop(1, 'rgba(255, 232, 146, 0)');
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(cx, cy, r * 2.2, 0, Math.PI * 2); ctx.fill();
 
-    // egg shape
-    ctx.fillStyle = fill;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, r * 0.82, r, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // shine
-    ctx.fillStyle = shine;
-    ctx.beginPath();
-    ctx.ellipse(cx - r * 0.25, cy - r * 0.35, r * 0.22, r * 0.32, -0.4, 0, Math.PI * 2);
-    ctx.fill();
-    // outline
-    ctx.strokeStyle = 'rgba(60, 30, 0, 0.25)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, r * 0.82, r, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  function drawMathEgg(cx, cy, r, value, correct) {
-    // pulsing golden glow
-    const pulse = 1 + Math.sin(performance.now() / 200) * 0.1;
-    const glowColor = 'rgba(255, 213, 74, 0.55)';
-    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 2.8 * pulse);
-    grad.addColorStop(0, glowColor);
-    grad.addColorStop(1, 'rgba(255, 213, 74, 0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(cx, cy, r * 2.8 * pulse, 0, Math.PI * 2); ctx.fill();
-
-    // egg
     ctx.fillStyle = '#fff4d1';
     ctx.beginPath();
-    ctx.ellipse(cx, cy, r * 0.88, r * 1.05, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, r * 0.85, r * 1.05, 0, 0, Math.PI * 2);
     ctx.fill();
-
-    ctx.strokeStyle = '#d4a017';
-    ctx.lineWidth = 2;
+    ctx.fillStyle = '#ffe892';
     ctx.beginPath();
-    ctx.ellipse(cx, cy, r * 0.88, r * 1.05, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx - r * 0.25, cy - r * 0.4, r * 0.22, r * 0.3, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(60, 30, 0, 0.3)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r * 0.85, r * 1.05, 0, 0, Math.PI * 2);
     ctx.stroke();
-
-    // number
-    ctx.fillStyle = '#1a0b2e';
-    ctx.font = `bold ${Math.floor(r * 0.95)}px Georgia, serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(String(value), cx, cy + 1);
   }
 
-  function drawPowerup(cx, cy, r, emoji, color) {
-    const pulse = 1 + Math.sin(performance.now() / 180) * 0.13;
-    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 2.5 * pulse);
+  function drawMathEgg(o) {
+    const cx = o.x, cy = o.y + Math.sin(performance.now() / 500 + o.seed) * 2;
+    const r = o.size;
+    const pulse = 1 + Math.sin(performance.now() / 200) * 0.12;
+
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 2.6 * pulse);
+    grad.addColorStop(0, 'rgba(255, 213, 74, 0.65)');
+    grad.addColorStop(1, 'rgba(255, 213, 74, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(cx, cy, r * 2.6 * pulse, 0, Math.PI * 2); ctx.fill();
+
+    ctx.fillStyle = '#fff4d1';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r * 0.9, r * 1.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#d4a017';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r * 0.9, r * 1.1, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = '#1a0b2e';
+    ctx.font = `bold ${Math.floor(r * 1.05)}px Georgia, serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(o.value), cx, cy + 1);
+  }
+
+  function drawPowerup(o) {
+    const t = performance.now();
+    const cx = o.x, cy = o.y + Math.sin(t / 400 + o.seed) * 3;
+    const r = o.size;
+    const pulse = 1 + Math.sin(t / 180) * 0.15;
+    const color = o.kind === 'fly' ? '#5ec3ff' : o.kind === 'power' ? '#ff6b35' : '#ffd54a';
+    const emoji = o.kind === 'fly' ? '✨' : o.kind === 'power' ? '🔥' : '⭐';
+
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 2.6 * pulse);
     grad.addColorStop(0, color + 'cc');
     grad.addColorStop(1, color + '00');
     ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(cx, cy, r * 2.5 * pulse, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, r * 2.6 * pulse, 0, Math.PI * 2); ctx.fill();
 
-    ctx.font = `${Math.floor(r * 1.6)}px sans-serif`;
+    ctx.font = `${Math.floor(r * 1.7)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(emoji, cx, cy + 1);
   }
 
-  function drawMiniDragon(cx, cy, r, palette, t) {
-    const flap = Math.sin(t * 8) * 0.3;
-    // body
-    ctx.fillStyle = palette.main;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, r * 0.85, r * 0.7, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // belly
-    ctx.fillStyle = palette.accent;
-    ctx.beginPath();
-    ctx.ellipse(cx - r * 0.05, cy + r * 0.2, r * 0.5, r * 0.35, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // wing
-    ctx.fillStyle = palette.accent;
-    ctx.beginPath();
-    ctx.moveTo(cx - r * 0.2, cy - r * 0.2);
-    ctx.quadraticCurveTo(cx - r * 0.6, cy - r * 0.9 - flap * 4, cx - r * 0.95, cy - r * 0.2);
-    ctx.quadraticCurveTo(cx - r * 0.6, cy - r * 0.4, cx - r * 0.2, cy - r * 0.2);
-    ctx.fill();
-    // head
-    ctx.fillStyle = palette.main;
-    ctx.beginPath();
-    ctx.arc(cx + r * 0.55, cy - r * 0.1, r * 0.45, 0, Math.PI * 2);
-    ctx.fill();
-    // eye
-    ctx.fillStyle = 'white';
-    ctx.beginPath();
-    ctx.arc(cx + r * 0.7, cy - r * 0.2, r * 0.14, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#000';
-    ctx.beginPath();
-    ctx.arc(cx + r * 0.74, cy - r * 0.2, r * 0.07, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  function drawDragon(d) {
-    if (!d) return;
-    const flying = state.powerup && state.powerup.kind === 'fly';
-    const powered = state.powerup && state.powerup.kind === 'power';
-    const t = performance.now() / 1000;
-
-    // body segments — gradient from gold (front) to fire/magic (tail)
-    const palette = TRIBES[d.tribe];
-    for (let i = d.body.length - 1; i >= 0; i--) {
-      const seg = d.body[i];
-      const cx = (seg.c + 0.5) * cellSize;
-      const cy = (seg.r + 0.5) * cellSize;
-      const headness = 1 - i / Math.max(1, d.body.length - 1); // 1 at head, 0 at tail
-      const size = cellSize * (0.42 + headness * 0.08);
-
-      if (flying) ctx.globalAlpha = 0.55;
-
-      // outer scale
-      const main = palette.main;
-      const accent = palette.accent;
-      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, size);
-      grad.addColorStop(0, accent);
-      grad.addColorStop(0.6, main);
-      grad.addColorStop(1, '#1a0b2e');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, size, 0, Math.PI * 2);
-      ctx.fill();
-
-      // ridge spikes (every 3rd segment)
-      if (i > 0 && i % 3 === 0) {
-        ctx.fillStyle = palette.accent;
-        const pdir = directionBetween(d.body[i - 1], seg);
-        const perp = { x: -pdir.dr, y: pdir.dc };
-        ctx.beginPath();
-        ctx.moveTo(cx + perp.x * size * 0.8, cy + perp.y * size * 0.8);
-        ctx.lineTo(cx, cy);
-        ctx.lineTo(cx - perp.x * size * 0.8, cy - perp.y * size * 0.8);
-        ctx.closePath();
-        ctx.fill();
-      }
-
-      ctx.globalAlpha = 1;
-    }
-
-    // head
-    const head = d.body[0];
-    const hx = (head.c + 0.5) * cellSize;
-    const hy = (head.r + 0.5) * cellSize;
-    const dir = d.dir;
-    const angle = Math.atan2(dir.dr, dir.dc);
-    drawDragonHead(hx, hy, cellSize * 0.55, angle, palette, t, powered);
-
-    // wings sprout from second segment
-    if (d.body.length > 2) {
-      const w = d.body[1];
-      const wx = (w.c + 0.5) * cellSize;
-      const wy = (w.r + 0.5) * cellSize;
-      drawDragonWings(wx, wy, cellSize * 0.9, angle, palette, t);
-    }
-  }
-
-  function directionBetween(a, b) {
-    return { dc: Math.sign(b.c - a.c), dr: Math.sign(b.r - a.r) };
-  }
-
-  function drawDragonHead(cx, cy, r, angle, palette, t, glow) {
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(angle);
-
-    if (glow) {
-      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 2.2);
-      g.addColorStop(0, 'rgba(255, 107, 53, 0.55)');
-      g.addColorStop(1, 'rgba(255, 107, 53, 0)');
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(0, 0, r * 2.2, 0, Math.PI * 2); ctx.fill();
-    }
-
-    // head shape (snout pointing along +x)
-    const grad = ctx.createLinearGradient(-r, 0, r, 0);
-    grad.addColorStop(0, palette.main);
-    grad.addColorStop(1, palette.accent);
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r * 1.1, r * 0.85, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // horns
-    ctx.fillStyle = palette.accent;
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.2, -r * 0.7);
-    ctx.lineTo(-r * 0.5, -r * 1.3);
-    ctx.lineTo(0, -r * 0.6);
-    ctx.closePath();
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.2, r * 0.7);
-    ctx.lineTo(-r * 0.5, r * 1.3);
-    ctx.lineTo(0, r * 0.6);
-    ctx.closePath();
-    ctx.fill();
-
-    // eye
-    ctx.fillStyle = 'white';
-    ctx.beginPath(); ctx.arc(r * 0.35, -r * 0.25, r * 0.22, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = palette.eye;
-    ctx.beginPath(); ctx.arc(r * 0.4, -r * 0.25, r * 0.13, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.arc(r * 0.43, -r * 0.25, r * 0.07, 0, Math.PI * 2); ctx.fill();
-    // eye shine
-    ctx.fillStyle = 'white';
-    ctx.beginPath(); ctx.arc(r * 0.45, -r * 0.3, r * 0.04, 0, Math.PI * 2); ctx.fill();
-
-    // nostril
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-    ctx.beginPath(); ctx.arc(r * 0.85, -r * 0.08, r * 0.06, 0, Math.PI * 2); ctx.fill();
-
-    // mouth — smiling
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(r * 0.55, r * 0.18);
-    ctx.quadraticCurveTo(r * 0.85, r * 0.42, r * 0.95, r * 0.18);
-    ctx.stroke();
-
-    // fire breath when powered
-    if (glow) {
-      const off = Math.sin(t * 18) * 2;
-      ctx.fillStyle = '#ffd54a';
-      ctx.beginPath();
-      ctx.moveTo(r * 1.0, -r * 0.1 + off);
-      ctx.lineTo(r * 1.8, -r * 0.25);
-      ctx.lineTo(r * 1.6, 0);
-      ctx.lineTo(r * 1.9, r * 0.2);
-      ctx.lineTo(r * 1.0, r * 0.15);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#ff6b35';
-      ctx.beginPath();
-      ctx.moveTo(r * 1.0, -r * 0.05);
-      ctx.lineTo(r * 1.4, -r * 0.1);
-      ctx.lineTo(r * 1.5, r * 0.05);
-      ctx.lineTo(r * 1.0, r * 0.1);
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    ctx.restore();
-  }
-
-  function drawDragonWings(cx, cy, span, angle, palette, t) {
-    const flap = Math.sin(t * 12) * 0.25 + 0.3;
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(angle);
-
-    ctx.fillStyle = palette.accent;
-    // top wing
-    ctx.beginPath();
-    ctx.moveTo(0, -span * 0.1);
-    ctx.quadraticCurveTo(-span * 0.4, -span * (0.5 + flap), -span * 0.85, -span * 0.15);
-    ctx.quadraticCurveTo(-span * 0.4, -span * 0.25, 0, -span * 0.1);
-    ctx.closePath();
-    ctx.fill();
-    // bottom wing
-    ctx.beginPath();
-    ctx.moveTo(0, span * 0.1);
-    ctx.quadraticCurveTo(-span * 0.4, span * (0.5 + flap), -span * 0.85, span * 0.15);
-    ctx.quadraticCurveTo(-span * 0.4, span * 0.25, 0, span * 0.1);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.restore();
-  }
-
-  function drawBigDragon(bd) {
-    const palette = TRIBES[bd.tribe];
-    const t = performance.now() / 1000;
-    for (let i = bd.path.length - 1; i >= 0; i--) {
-      const seg = bd.path[i];
-      const cx = (seg.c + 0.5) * cellSize;
-      const cy = (seg.r + 0.5) * cellSize;
-      const size = cellSize * (0.55 + (1 - i / bd.path.length) * 0.1);
-
-      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, size);
-      grad.addColorStop(0, palette.accent);
-      grad.addColorStop(0.6, palette.main);
-      grad.addColorStop(1, '#0d0420');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, size, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // angry head
-    const head = bd.path[0];
-    const hx = (head.c + 0.5) * cellSize;
-    const hy = (head.r + 0.5) * cellSize;
-    const angle = Math.atan2(bd.dir.dr, bd.dir.dc);
-    ctx.save();
-    ctx.translate(hx, hy);
-    ctx.rotate(angle);
-
-    const r = cellSize * 0.7;
-    // head
-    const g = ctx.createLinearGradient(-r, 0, r, 0);
-    g.addColorStop(0, palette.main);
-    g.addColorStop(1, palette.accent);
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r * 1.1, r * 0.85, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // big horns
-    ctx.fillStyle = '#1a0b2e';
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.15, -r * 0.7);
-    ctx.lineTo(-r * 0.6, -r * 1.4);
-    ctx.lineTo(0.05, -r * 0.5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.15, r * 0.7);
-    ctx.lineTo(-r * 0.6, r * 1.4);
-    ctx.lineTo(0.05, r * 0.5);
-    ctx.closePath();
-    ctx.fill();
-
-    // angry red eye
-    ctx.fillStyle = '#ffd54a';
-    ctx.beginPath(); ctx.arc(r * 0.35, -r * 0.2, r * 0.2, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#c2410c';
-    ctx.beginPath(); ctx.arc(r * 0.4, -r * 0.2, r * 0.1, 0, Math.PI * 2); ctx.fill();
-    // angry brow
-    ctx.strokeStyle = '#1a0b2e';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.moveTo(r * 0.15, -r * 0.55);
-    ctx.lineTo(r * 0.55, -r * 0.35);
-    ctx.stroke();
-
-    // teeth
-    ctx.fillStyle = 'white';
-    for (let k = 0; k < 4; k++) {
-      ctx.beginPath();
-      ctx.moveTo(r * (0.55 + k * 0.12), r * 0.15);
-      ctx.lineTo(r * (0.58 + k * 0.12), r * 0.4);
-      ctx.lineTo(r * (0.6 + k * 0.12), r * 0.15);
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    ctx.restore();
-  }
-
   // ===== Input =====
   document.addEventListener('keydown', (ev) => {
-    if (!state.running) return;
-    switch (ev.key) {
-      case 'ArrowUp': case 'w': case 'W': setDir(0, -1); ev.preventDefault(); break;
-      case 'ArrowDown': case 's': case 'S': setDir(0, 1); ev.preventDefault(); break;
-      case 'ArrowLeft': case 'a': case 'A': setDir(-1, 0); ev.preventDefault(); break;
-      case 'ArrowRight': case 'd': case 'D': setDir(1, 0); ev.preventDefault(); break;
-      case ' ': case 'p': case 'P': togglePause(); ev.preventDefault(); break;
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(ev.key)) ev.preventDefault();
+    state.keys.add(ev.key);
+    if (ev.key === ' ' || ev.key === 'p' || ev.key === 'P') {
+      togglePause();
     }
   });
+  document.addEventListener('keyup', (ev) => {
+    state.keys.delete(ev.key);
+  });
 
-  // touch/swipe
-  let touchStart = null;
+  function canvasPoint(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (clientX - rect.left) / rect.width * PLAY_W;
+    const y = (clientY - rect.top) / rect.height * PLAY_H;
+    return { x, y };
+  }
+  canvas.addEventListener('mousedown', (ev) => {
+    state.touch = canvasPoint(ev.clientX, ev.clientY);
+  });
+  canvas.addEventListener('mousemove', (ev) => {
+    if (state.touch) state.touch = canvasPoint(ev.clientX, ev.clientY);
+  });
+  canvas.addEventListener('mouseup', () => { state.touch = null; });
+  canvas.addEventListener('mouseleave', () => { state.touch = null; });
   canvas.addEventListener('touchstart', (ev) => {
     const t = ev.touches[0];
-    touchStart = { x: t.clientX, y: t.clientY };
-  }, { passive: true });
-  canvas.addEventListener('touchmove', (ev) => {
-    if (!touchStart) return;
-    const t = ev.touches[0];
-    const dx = t.clientX - touchStart.x;
-    const dy = t.clientY - touchStart.y;
-    const threshold = 22;
-    if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
-    if (Math.abs(dx) > Math.abs(dy)) setDir(dx > 0 ? 1 : -1, 0);
-    else setDir(0, dy > 0 ? 1 : -1);
-    touchStart = { x: t.clientX, y: t.clientY };
+    state.touch = canvasPoint(t.clientX, t.clientY);
     ev.preventDefault();
   }, { passive: false });
-  canvas.addEventListener('touchend', () => { touchStart = null; });
+  canvas.addEventListener('touchmove', (ev) => {
+    const t = ev.touches[0];
+    state.touch = canvasPoint(t.clientX, t.clientY);
+    ev.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener('touchend', () => { state.touch = null; });
 
   function togglePause() {
     if (!state.running) return;
@@ -1076,7 +1010,35 @@
     pauseScreen.classList.toggle('active', state.paused);
   }
 
-  // ===== Difficulty button wiring =====
+  // ===== UI wiring =====
+  function pickDifficulty(d) {
+    state.difficulty = d;
+    document.querySelectorAll('.diff-btn').forEach(b => {
+      const isSel = b.dataset.diff === d;
+      b.classList.toggle('selected', isSel);
+      b.setAttribute('aria-checked', String(isSel));
+    });
+  }
+
+  function renderPlayerPicker() {
+    const container = $('player-picker');
+    if (!container || PLAYER_CHARS.length === 0) return;
+    container.innerHTML = PLAYER_CHARS.map((c, i) => `
+      <button class="player-card${i === state.chosenCharIndex ? ' selected' : ''}" data-i="${i}" aria-label="${escapeHtml(c.name)}">
+        <img src="${escapeHtml(c.image)}" alt="" loading="lazy">
+        <span class="player-name">${escapeHtml(c.name)}</span>
+        <span class="player-tribe">${escapeHtml(c.tribe || '')}</span>
+      </button>
+    `).join('');
+    container.querySelectorAll('.player-card').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.chosenCharIndex = Number(btn.dataset.i);
+        container.querySelectorAll('.player-card').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    });
+  }
+
   document.querySelectorAll('.diff-btn').forEach(b => {
     b.addEventListener('click', () => pickDifficulty(b.dataset.diff));
   });
@@ -1088,6 +1050,7 @@
     state.running = false;
     cancelAnimationFrame(state.rafId);
     pauseScreen.classList.remove('active');
+    renderStartLeaderboard();
     showScreen('start-screen');
   });
   $('play-again-btn').addEventListener('click', () => {
@@ -1096,96 +1059,58 @@
   });
   $('home-btn').addEventListener('click', () => {
     gameoverScreen.classList.remove('active');
+    renderStartLeaderboard();
     showScreen('start-screen');
+  });
+  $('save-score-btn').addEventListener('click', submitLeaderboard);
+  $('lb-name-input').addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); submitLeaderboard(); }
+  });
+  $('clear-lb-btn').addEventListener('click', () => {
+    if (confirm('Clear the leaderboard? This cannot be undone.')) {
+      localStorage.removeItem(LB_KEY);
+      renderStartLeaderboard();
+      hudBest.textContent = 0;
+    }
   });
 
   window.addEventListener('resize', () => { if (state.running) sizeCanvas(); });
 
-  // ===== Start screen preview animation =====
+  // ===== Start-screen preview animation =====
   function previewLoop() {
     const w = previewCanvas.width;
     const h = previewCanvas.height;
     previewCtx.clearRect(0, 0, w, h);
     const t = performance.now() / 1000;
-    const cx = w / 2 + Math.sin(t) * 12;
-    const cy = h / 2 + Math.cos(t * 1.4) * 6;
-    const palette = TRIBES.SkyWing;
-
-    // wings
-    drawDragonWingsRaw(previewCtx, cx, cy, 70, 0, palette, t);
-    // head (using same logic with canvas ctx)
-    drawDragonHeadRaw(previewCtx, cx, cy, 28, Math.sin(t) * 0.1, palette, t);
-
-    // sparkles around
-    for (let i = 0; i < 5; i++) {
-      const ang = t + i * 1.25;
-      const rr = 60 + Math.sin(t * 2 + i) * 8;
+    const char = PLAYER_CHARS[state.chosenCharIndex];
+    const img = char ? loadImage(char.image) : null;
+    const cx = w / 2 + Math.sin(t) * 8;
+    const cy = h / 2 + Math.cos(t * 1.4) * 5;
+    if (img && img.complete && img.naturalWidth > 0) {
+      const aspect = img.naturalWidth / img.naturalHeight;
+      let drawH = h * 0.95, drawW = drawH * aspect;
+      if (drawW > w * 0.95) { drawW = w * 0.95; drawH = drawW / aspect; }
+      previewCtx.drawImage(img, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
+    }
+    // sparkles
+    for (let i = 0; i < 6; i++) {
+      const ang = t + i * 1.05;
+      const rr = 75 + Math.sin(t * 2 + i) * 8;
       const sx = cx + Math.cos(ang) * rr;
       const sy = cy + Math.sin(ang) * rr;
-      previewCtx.fillStyle = 'rgba(255, 213, 74, 0.8)';
+      previewCtx.fillStyle = 'rgba(255, 213, 74, 0.9)';
       previewCtx.beginPath();
       previewCtx.arc(sx, sy, 2 + Math.sin(t * 3 + i) * 1, 0, Math.PI * 2);
       previewCtx.fill();
     }
-
     requestAnimationFrame(previewLoop);
   }
 
-  function drawDragonHeadRaw(ctxIn, cx, cy, r, angle, palette, t) {
-    ctxIn.save();
-    ctxIn.translate(cx, cy);
-    ctxIn.rotate(angle);
-    const grad = ctxIn.createLinearGradient(-r, 0, r, 0);
-    grad.addColorStop(0, palette.main);
-    grad.addColorStop(1, palette.accent);
-    ctxIn.fillStyle = grad;
-    ctxIn.beginPath();
-    ctxIn.ellipse(0, 0, r * 1.1, r * 0.85, 0, 0, Math.PI * 2);
-    ctxIn.fill();
-    // horns
-    ctxIn.fillStyle = palette.accent;
-    ctxIn.beginPath();
-    ctxIn.moveTo(-r * 0.2, -r * 0.7); ctxIn.lineTo(-r * 0.5, -r * 1.3); ctxIn.lineTo(0, -r * 0.6); ctxIn.closePath(); ctxIn.fill();
-    ctxIn.beginPath();
-    ctxIn.moveTo(-r * 0.2, r * 0.7); ctxIn.lineTo(-r * 0.5, r * 1.3); ctxIn.lineTo(0, r * 0.6); ctxIn.closePath(); ctxIn.fill();
-    // eye
-    ctxIn.fillStyle = 'white'; ctxIn.beginPath(); ctxIn.arc(r * 0.35, -r * 0.25, r * 0.22, 0, Math.PI * 2); ctxIn.fill();
-    ctxIn.fillStyle = palette.eye; ctxIn.beginPath(); ctxIn.arc(r * 0.4, -r * 0.25, r * 0.13, 0, Math.PI * 2); ctxIn.fill();
-    ctxIn.fillStyle = '#000'; ctxIn.beginPath(); ctxIn.arc(r * 0.43, -r * 0.25, r * 0.07, 0, Math.PI * 2); ctxIn.fill();
-    ctxIn.fillStyle = 'white'; ctxIn.beginPath(); ctxIn.arc(r * 0.45, -r * 0.3, r * 0.04, 0, Math.PI * 2); ctxIn.fill();
-    // smile
-    ctxIn.strokeStyle = 'rgba(0,0,0,0.55)'; ctxIn.lineWidth = 1.6;
-    ctxIn.beginPath();
-    ctxIn.moveTo(r * 0.55, r * 0.18);
-    ctxIn.quadraticCurveTo(r * 0.85, r * 0.42, r * 0.95, r * 0.18);
-    ctxIn.stroke();
-    ctxIn.restore();
-  }
-
-  function drawDragonWingsRaw(ctxIn, cx, cy, span, angle, palette, t) {
-    const flap = Math.sin(t * 6) * 0.3 + 0.3;
-    ctxIn.save();
-    ctxIn.translate(cx, cy);
-    ctxIn.rotate(angle);
-    ctxIn.fillStyle = palette.accent + 'cc';
-    ctxIn.beginPath();
-    ctxIn.moveTo(0, -span * 0.05);
-    ctxIn.quadraticCurveTo(-span * 0.4, -span * (0.5 + flap), -span * 0.85, -span * 0.05);
-    ctxIn.quadraticCurveTo(-span * 0.4, -span * 0.2, 0, -span * 0.05);
-    ctxIn.closePath();
-    ctxIn.fill();
-    ctxIn.beginPath();
-    ctxIn.moveTo(0, span * 0.05);
-    ctxIn.quadraticCurveTo(-span * 0.4, span * (0.5 + flap), -span * 0.85, span * 0.05);
-    ctxIn.quadraticCurveTo(-span * 0.4, span * 0.2, 0, span * 0.05);
-    ctxIn.closePath();
-    ctxIn.fill();
-    ctxIn.restore();
-  }
-
-  // init
-  hudBest.textContent = state.best;
+  // ===== Init =====
+  hudBest.textContent = getTopScore();
   pickDifficulty('hard');
+  renderStartLeaderboard();
+  loadCharacters();
   previewLoop();
 
 })();

@@ -1,0 +1,902 @@
+[
+  {
+    "name": "Clay",
+    "tribe": "MudWing",
+    "main_color": "#8B3A1E",
+    "secondary_color": "#D9A45F",
+    "accent_color": "#E95522",
+    "eye_color": "#87CEEB",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/9/97/ClayTemplateS978.png/revision/latest?cb=20210907015340"
+  },
+  {
+    "name": "Tsunami",
+    "tribe": "SeaWing",
+    "main_color": "#0077B6",
+    "secondary_color": "#6FD3E6",
+    "accent_color": "#BDEFFF",
+    "eye_color": "#00CED1",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/0/0a/TsunamiTemplateSkyla.png/revision/latest?cb=20251124013513"
+  },
+  {
+    "name": "Glory",
+    "tribe": "RainWing",
+    "main_color": "#2E8B57",
+    "secondary_color": "#F5F5DC",
+    "accent_color": "#1E90FF",
+    "eye_color": "#1E90FF",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/2/2c/GloryTemplateSkyla.png/revision/latest?cb=20210705133124"
+  },
+  {
+    "name": "Starflight",
+    "tribe": "NightWing",
+    "main_color": "#0B0B16",
+    "secondary_color": "#2F3742",
+    "accent_color": "#C0C0C0",
+    "eye_color": "#C8C8D0",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/0/04/StarflightTemplateGoosefeathers.png/revision/latest?cb=20210207040814"
+  },
+  {
+    "name": "Sunny",
+    "tribe": "SandWing",
+    "main_color": "#D4A017",
+    "secondary_color": "#FFF5C8",
+    "accent_color": "#8B5A1E",
+    "eye_color": "#32CD32",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/b/ba/SunnyTemplateDolphin.png/revision/latest?cb=20210324014532"
+  },
+  {
+    "name": "Moonwatcher",
+    "tribe": "NightWing",
+    "main_color": "#10251C",
+    "secondary_color": "#8FA29A",
+    "accent_color": "#E6E6E6",
+    "eye_color": "#9ACD32",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/0/0e/MoonwatcherTemplateSSE.png/revision/latest?cb=20210219024907"
+  },
+  {
+    "name": "Kinkajou",
+    "tribe": "RainWing",
+    "main_color": "#E8C75A",
+    "secondary_color": "#F5E5A8",
+    "accent_color": "#D64CA6",
+    "eye_color": "#90EE90",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/1/10/KinkajouTemplateRix.png/revision/latest?cb=20210618025247"
+  },
+  {
+    "name": "Winter",
+    "tribe": "IceWing",
+    "main_color": "#CFE8FF",
+    "secondary_color": "#F8FBFF",
+    "accent_color": "#2F5D8C",
+    "eye_color": "#0B2E5C",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/2/20/WinterTemplateSSE.png/revision/latest?cb=20210528041430"
+  },
+  {
+    "name": "Qibli",
+    "tribe": "SandWing",
+    "main_color": "#D6C45A",
+    "secondary_color": "#F5EEC2",
+    "accent_color": "#A88A22",
+    "eye_color": "#2F2B12",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/c/c3/QibliTemplateSSE.png/revision/latest?cb=20210120191756"
+  },
+  {
+    "name": "Turtle",
+    "tribe": "SeaWing",
+    "main_color": "#2E8B57",
+    "secondary_color": "#98D8A8",
+    "accent_color": "#C7F2C2",
+    "eye_color": "#228B22",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/9/9a/TurtleTemplateS978.png/revision/latest?cb=20210406025615"
+  },
+  {
+    "name": "Peril",
+    "tribe": "SkyWing",
+    "main_color": "#F05A24",
+    "secondary_color": "#FFD34D",
+    "accent_color": "#B22222",
+    "eye_color": "#00AEEF",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/a/ac/PerilTemplateBas.png/revision/latest?cb=20210517201741"
+  },
+  {
+    "name": "Umber",
+    "tribe": "MudWing",
+    "main_color": "#7A3B2E",
+    "secondary_color": "#C89B5B",
+    "accent_color": "#E64A2E",
+    "eye_color": "#D8C0A0",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/2/20/UmberTemplateSkyla.png/revision/latest?cb=20251222214427"
+  },
+  {
+    "name": "Anemone",
+    "tribe": "SeaWing",
+    "main_color": "#9AC9D6",
+    "secondary_color": "#C6F0F5",
+    "accent_color": "#F4A6C8",
+    "eye_color": "#4DA6C8",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/a/a7/AnemoneCoverTemplateS978.png/revision/latest/scale-to-width-down/1000?cb=20220205173603"
+  },
+  {
+    "name": "Burn",
+    "tribe": "SandWing",
+    "main_color": "#8B4A2B",
+    "secondary_color": "#D2A35F",
+    "accent_color": "#3A2418",
+    "eye_color": "#8B0000",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/a/a8/BurnTemplateSSE.png/revision/latest?cb=20211231223002"
+  },
+  {
+    "name": "Blister",
+    "tribe": "SandWing",
+    "main_color": "#C6A35A",
+    "secondary_color": "#F1D58A",
+    "accent_color": "#6B4F1D",
+    "eye_color": "#1E90FF",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/c/ce/BlisterTemplateSSE.png/revision/latest/scale-to-width-down/1000?cb=20210507183058"
+  },
+  {
+    "name": "Blaze",
+    "tribe": "SandWing",
+    "main_color": "#F0C96A",
+    "secondary_color": "#FFF0B8",
+    "accent_color": "#D99B2B",
+    "eye_color": "#87CEFA",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/7/7f/BlazeTemplateBas.png/revision/latest?cb=20210413214421"
+  },
+  {
+    "name": "Thorn",
+    "tribe": "SandWing",
+    "main_color": "#B88745",
+    "secondary_color": "#E0BE76",
+    "accent_color": "#6B3E1F",
+    "eye_color": "#2E8B57",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/2/20/ThornTemplateS978.png/revision/latest?cb=20211231013903"
+  },
+  {
+    "name": "Smolder",
+    "tribe": "SandWing",
+    "main_color": "#C98A3A",
+    "secondary_color": "#F0D18A",
+    "accent_color": "#7A4A1E",
+    "eye_color": "#8B5A2B",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/e/ed/SmolderTemplateSSE.png/revision/latest?cb=20210508170008"
+  },
+  {
+    "name": "Scarlet",
+    "tribe": "SkyWing",
+    "main_color": "#B22222",
+    "secondary_color": "#F0A040",
+    "accent_color": "#7A0C0C",
+    "eye_color": "#FFD700",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/3/3d/ScarletTemplateRix.png/revision/latest?cb=20210718192256"
+  },
+  {
+    "name": "Ruby",
+    "tribe": "SkyWing",
+    "main_color": "#C0392B",
+    "secondary_color": "#F2A65A",
+    "accent_color": "#8B1A1A",
+    "eye_color": "#FFD700",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/0/09/RubyTemplateYSLF.png/revision/latest?cb=20240109141225"
+  },
+  {
+    "name": "Coral",
+    "tribe": "SeaWing",
+    "main_color": "#0B7FA5",
+    "secondary_color": "#75D8E5",
+    "accent_color": "#C7F6FF",
+    "eye_color": "#00BFFF",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/1/18/CoralTemplateSkyla.png/revision/latest?cb=20260127092924"
+  },
+  {
+    "name": "Gill",
+    "tribe": "SeaWing",
+    "main_color": "#3A6B4F",
+    "secondary_color": "#A8D8B0",
+    "accent_color": "#D5EFD5",
+    "eye_color": "#5A8BC9",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/1/1b/GillTemplateRix.png/revision/latest?cb=20210807175049"
+  },
+  {
+    "name": "Glacier",
+    "tribe": "IceWing",
+    "main_color": "#DDEEFF",
+    "secondary_color": "#FFFFFF",
+    "accent_color": "#8DB7D8",
+    "eye_color": "#1E5AA8",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/f/ff/GlacierTemplateSkyla.png/revision/latest?cb=20260213131922"
+  },
+  {
+    "name": "Snowfall",
+    "tribe": "IceWing",
+    "main_color": "#EAF6FF",
+    "secondary_color": "#FFFFFF",
+    "accent_color": "#9CC7E6",
+    "eye_color": "#2F5D8C",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/a/a1/SnowfallTemplateRix.png/revision/latest?cb=20210407044538"
+  },
+  {
+    "name": "Lynx",
+    "tribe": "IceWing",
+    "main_color": "#D6ECF8",
+    "secondary_color": "#F7FCFF",
+    "accent_color": "#87AFC7",
+    "eye_color": "#0B3D91",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/5/53/LynxTemplateBee.png/revision/latest?cb=20260227201608"
+  },
+  {
+    "name": "Hailstorm",
+    "tribe": "IceWing",
+    "main_color": "#C7E6F5",
+    "secondary_color": "#F4FBFF",
+    "accent_color": "#6F9FC2",
+    "eye_color": "#1E5AA8",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/4/4e/HailstormTemplateYSLF.png/revision/latest?cb=20240113151126"
+  },
+  {
+    "name": "Icicle",
+    "tribe": "IceWing",
+    "main_color": "#D9F0FF",
+    "secondary_color": "#FFFFFF",
+    "accent_color": "#7EAED0",
+    "eye_color": "#0B2E5C",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/1/1a/IcicleTemplateYSLF.png/revision/latest?cb=20240111165203"
+  },
+  {
+    "name": "Mangrove",
+    "tribe": "RainWing",
+    "main_color": "#2E8B57",
+    "secondary_color": "#F0E6A0",
+    "accent_color": "#D94B4B",
+    "eye_color": "#FFD700",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/c/c9/MangroveTemplateSkyla.png/revision/latest?cb=20260321203820"
+  },
+  {
+    "name": "Jambu",
+    "tribe": "RainWing",
+    "main_color": "#E96BA8",
+    "secondary_color": "#F7E6A3",
+    "accent_color": "#FFD700",
+    "eye_color": "#2E8B57",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/c/c8/JambuTemplateLoopy.png/revision/latest?cb=20260224002020"
+  },
+  {
+    "name": "Fatespeaker",
+    "tribe": "NightWing",
+    "main_color": "#1E1A2E",
+    "secondary_color": "#7B6D8D",
+    "accent_color": "#A889C9",
+    "eye_color": "#C8A2C8",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/8/8a/FatespeakerTemplateSkyla.png/revision/latest?cb=20260127093221"
+  },
+  {
+    "name": "Morrowseer",
+    "tribe": "NightWing",
+    "main_color": "#0A0A0F",
+    "secondary_color": "#2E2E38",
+    "accent_color": "#4B3A66",
+    "eye_color": "#FFD700",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/6/64/MorrowseerTemplateSSE.png/revision/latest?cb=20210215172933"
+  },
+  {
+    "name": "Mastermind",
+    "tribe": "NightWing",
+    "main_color": "#12121A",
+    "secondary_color": "#3B4048",
+    "accent_color": "#5B5270",
+    "eye_color": "#D8D8D8",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/5/5e/MastermindTemplateSkyla.png/revision/latest?cb=20260120225119"
+  },
+  {
+    "name": "Darkstalker",
+    "tribe": "NightWing",
+    "main_color": "#05050A",
+    "secondary_color": "#333A45",
+    "accent_color": "#C0C0C0",
+    "eye_color": "#E6E6E6",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/3/35/DarkstalkerTemplateSSE.png/revision/latest?cb=20210217174432"
+  },
+  {
+    "name": "Clearsight",
+    "tribe": "NightWing",
+    "main_color": "#121826",
+    "secondary_color": "#4D5F6A",
+    "accent_color": "#9EC8D8",
+    "eye_color": "#8EE6FF",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/8/88/ClearsightTemplateS978.png/revision/latest?cb=20260117191405"
+  },
+  {
+    "name": "Whiteout",
+    "tribe": "NightWing",
+    "main_color": "#E8E8E8",
+    "secondary_color": "#FDFDFD",
+    "accent_color": "#111111",
+    "eye_color": "#D8C8FF",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/b/b3/WhiteoutTemplateS978.png/revision/latest?cb=20260117191953"
+  },
+  {
+    "name": "Stonemover",
+    "tribe": "NightWing",
+    "main_color": "#6F6F6F",
+    "secondary_color": "#B8B0A0",
+    "accent_color": "#3A2A1E",
+    "eye_color": "#8B6F47",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/6/61/StonemoverTemplateS978.png/revision/latest?cb=20211229030247"
+  },
+  {
+    "name": "Webs",
+    "tribe": "SeaWing",
+    "main_color": "#2A7FA5",
+    "secondary_color": "#95DDE8",
+    "accent_color": "#CFFAFF",
+    "eye_color": "#00AEEF",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/8/88/WebsTemplateGoosefeathers.png/revision/latest?cb=20210223003013"
+  },
+  {
+    "name": "Riptide",
+    "tribe": "SeaWing",
+    "main_color": "#1F8AA8",
+    "secondary_color": "#8FDDE0",
+    "accent_color": "#BFF6FF",
+    "eye_color": "#00BFFF",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/6/6c/RiptideTemplateSkyla.png/revision/latest?cb=20251226175748"
+  },
+  {
+    "name": "Auklet",
+    "tribe": "SeaWing",
+    "main_color": "#2E8B57",
+    "secondary_color": "#7FCBA1",
+    "accent_color": "#ADFF2F",
+    "eye_color": "#228B22",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/3/3f/AukletTemplateSSE.png/revision/latest?cb=20210602174927"
+  },
+  {
+    "name": "Blue",
+    "tribe": "SilkWing",
+    "main_color": "#48B9D8",
+    "secondary_color": "#B9F2FF",
+    "accent_color": "#6A5ACD",
+    "eye_color": "#2E8B57",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/7/7b/BlueTemplateGoosefeathers.png/revision/latest?cb=20210226214001"
+  },
+  {
+    "name": "Luna",
+    "tribe": "SilkWing",
+    "main_color": "#B8E986",
+    "secondary_color": "#F3FAD2",
+    "accent_color": "#8FD8D8",
+    "eye_color": "#2E8B57",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/3/31/LunaTemplateGoosefeathers.png/revision/latest?cb=20210317232718"
+  },
+  {
+    "name": "Cricket",
+    "tribe": "HiveWing",
+    "main_color": "#E0A21B",
+    "secondary_color": "#F5D45A",
+    "accent_color": "#111111",
+    "eye_color": "#5A2A0A",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/e/e2/CricketTemplateS978.png/revision/latest?cb=20220102012055"
+  },
+  {
+    "name": "Sundew",
+    "tribe": "LeafWing",
+    "main_color": "#2F7D32",
+    "secondary_color": "#8DBE55",
+    "accent_color": "#1B4D1B",
+    "eye_color": "#8B4513",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/6/63/SundewTemplateS978.png/revision/latest"
+  },
+  {
+    "name": "Swordtail",
+    "tribe": "SilkWing",
+    "main_color": "#E87522",
+    "secondary_color": "#F4C06A",
+    "accent_color": "#5B1E8A",
+    "eye_color": "#2E2E2E",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/d/d3/SwordtailTemplateS978.png/revision/latest?cb=20220101194755"
+  },
+  {
+    "name": "Io",
+    "tribe": "SilkWing",
+    "main_color": "#5D2E8C",
+    "secondary_color": "#E8DCC8",
+    "accent_color": "#8FD9B7",
+    "eye_color": "#7A1E5C",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/e/e8/IoTemplateSkyla.png/revision/latest?cb=20260505144002"
+  },
+  {
+    "name": "Bumblebee",
+    "tribe": "HiveWing",
+    "main_color": "#FFD43B",
+    "secondary_color": "#FFF1A8",
+    "accent_color": "#1A1A1A",
+    "eye_color": "#6B4A00",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/d/d4/BumblebeeTemplateS978.png/revision/latest?cb=20220305033456"
+  },
+  {
+    "name": "Wasp",
+    "tribe": "HiveWing",
+    "main_color": "#B8860B",
+    "secondary_color": "#E6C45A",
+    "accent_color": "#101010",
+    "eye_color": "#8B0000",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/7/7f/WaspTemplateS978.png/revision/latest?cb=20260123085955"
+  },
+  {
+    "name": "Willow",
+    "tribe": "LeafWing",
+    "main_color": "#4F8F3A",
+    "secondary_color": "#9BC56E",
+    "accent_color": "#2E5B2E",
+    "eye_color": "#6B8E23",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/9/95/WillowTemplateSSE.png/revision/latest?cb=20210420142844"
+  },
+  {
+    "name": "Hazel",
+    "tribe": "LeafWing",
+    "main_color": "#2E5B2E",
+    "secondary_color": "#6B8E4E",
+    "accent_color": "#1A3A1A",
+    "eye_color": "#6B8E23",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/c/cb/HazelTemplateLucky.png/revision/latest?cb=20250929194924"
+  },
+  {
+    "name": "Cliff",
+    "tribe": "SkyWing",
+    "main_color": "#D9471E",
+    "secondary_color": "#F0A34A",
+    "accent_color": "#8B1E12",
+    "eye_color": "#FFD700",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/b/b9/CliffTemplateSkyla.png/revision/latest?cb=20241227002227"
+  },
+  {
+    "name": "Tamarin",
+    "tribe": "RainWing",
+    "main_color": "#B8C66A",
+    "secondary_color": "#F5E6A0",
+    "accent_color": "#7AA66A",
+    "eye_color": "#D2C2A8",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/a/ab/TamarinTemplateSkyla.png/revision/latest?cb=20260319101632"
+  },
+  {
+    "name": "Pike",
+    "tribe": "SeaWing",
+    "main_color": "#1E77A8",
+    "secondary_color": "#8DD8E8",
+    "accent_color": "#C8F7FF",
+    "eye_color": "#00BFFF",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/b/bc/PikeTemplateSkyla.png/revision/latest?cb=20230310145638"
+  },
+  {
+    "name": "Freedom",
+    "tribe": "Hybrid",
+    "main_color": "#B8A088",
+    "secondary_color": "#9B8676",
+    "accent_color": "#6B5B73",
+    "eye_color": "#4A6B5A",
+    "image": ""
+  },
+  {
+    "name": "Silverspot",
+    "tribe": "SilkWing",
+    "main_color": "#E6E6E6",
+    "secondary_color": "#F7F7F7",
+    "accent_color": "#B0B0B0",
+    "eye_color": "#C0C0C0",
+    "image": ""
+  },
+  {
+    "name": "Onyx",
+    "tribe": "SandWing",
+    "main_color": "#7A6D4E",
+    "secondary_color": "#E5D9AE",
+    "accent_color": "#0B0D16",
+    "eye_color": "#050505",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/5/5e/OnyxTemplateS978.png/revision/latest?cb=20211231213035"
+  },
+  {
+    "name": "Listener",
+    "tribe": "NightWing",
+    "main_color": "#20282A",
+    "secondary_color": "#9BA6AB",
+    "accent_color": "#8B91C7",
+    "eye_color": "#B7E6DD",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/a/a2/ListenerTemplateSkyla.png/revision/latest?cb=20251116233058"
+  },
+  {
+    "name": "Sora",
+    "tribe": "MudWing",
+    "main_color": "#8B4F2F",
+    "secondary_color": "#C59A56",
+    "accent_color": "#4A2A1C",
+    "eye_color": "#B77A35",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/3/33/SoraTemplateSSE.png/revision/latest?cb=20210603210150"
+  },
+  {
+    "name": "Moorhen",
+    "tribe": "MudWing",
+    "main_color": "#B65A24",
+    "secondary_color": "#E67A22",
+    "accent_color": "#2B9DB0",
+    "eye_color": "#D8A33A",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/4/4e/MoorhenTemplateBlackbleach.png/revision/latest?cb=20260527234455"
+  },
+  {
+    "name": "Marsh",
+    "tribe": "MudWing",
+    "main_color": "#7E4A24",
+    "secondary_color": "#D7B45A",
+    "accent_color": "#4B2A16",
+    "eye_color": "#A86B2D",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/5/58/MarshTemplateSSE.png/revision/latest?cb=20210603202324"
+  },
+  {
+    "name": "Reed",
+    "tribe": "MudWing",
+    "main_color": "#8E3F25",
+    "secondary_color": "#D88638",
+    "accent_color": "#4A1F1F",
+    "eye_color": "#C46E2A",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/4/46/ReedTemplateSSE.png/revision/latest?cb=20210130003823"
+  },
+  {
+    "name": "Ostrich",
+    "tribe": "SandWing",
+    "main_color": "#D6B16E",
+    "secondary_color": "#F0E2C0",
+    "accent_color": "#8A5D2A",
+    "eye_color": "#3A2A1A",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/3/3e/OstrichTemplateSSE.png/revision/latest?cb=20211231165000"
+  },
+  {
+    "name": "Cobra",
+    "tribe": "SandWing",
+    "main_color": "#D6B56E",
+    "secondary_color": "#F4D980",
+    "accent_color": "#51483D",
+    "eye_color": "#1A1A1A",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/e/e2/Cobrapg83.png/revision/latest?cb=20240121073751"
+  },
+  {
+    "name": "Vulture",
+    "tribe": "SandWing",
+    "main_color": "#B9AA8A",
+    "secondary_color": "#6D604A",
+    "accent_color": "#191712",
+    "eye_color": "#B9972F",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/3/3d/VultureTemplateSSE.png/revision/latest?cb=20210615125309"
+  },
+  {
+    "name": "Eagle",
+    "tribe": "SkyWing",
+    "main_color": "#B34758",
+    "secondary_color": "#D3222C",
+    "accent_color": "#E6A8AE",
+    "eye_color": "#6E1E33",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/1/11/EagleWTTemplateSkyla.png/revision/latest?cb=20240106221601"
+  },
+  {
+    "name": "Fathom",
+    "tribe": "SeaWing",
+    "main_color": "#087E6C",
+    "secondary_color": "#8CC7B4",
+    "accent_color": "#9AC98F",
+    "eye_color": "#123F4A",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/7/73/FathomTemplateLucky.png/revision/latest?cb=20251106172309"
+  },
+  {
+    "name": "Albatross",
+    "tribe": "SeaWing",
+    "main_color": "#8EAFC1",
+    "secondary_color": "#C3DCE5",
+    "accent_color": "#E8F6F8",
+    "eye_color": "#2B4B5B",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/3/3c/AlbatrossTemplateS978.png/revision/latest?cb=20220109204158"
+  },
+  {
+    "name": "Mink",
+    "tribe": "IceWing",
+    "main_color": "#E8ECEE",
+    "secondary_color": "#8A8E8F",
+    "accent_color": "#55595C",
+    "eye_color": "#1C2F5A",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/2/2f/MinkTemplateLeslie.png/revision/latest?cb=20210312000940"
+  },
+  {
+    "name": "Crystal",
+    "tribe": "IceWing",
+    "main_color": "#E9F1F3",
+    "secondary_color": "#C6D4DA",
+    "accent_color": "#F0E7B8",
+    "eye_color": "#2E6A73",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/c/cb/CrystalTemplateSkyla.png/revision/latest?cb=20260519211252"
+  },
+  {
+    "name": "Tundra",
+    "tribe": "IceWing",
+    "main_color": "#DCE5E8",
+    "secondary_color": "#AEBBC1",
+    "accent_color": "#40484B",
+    "eye_color": "#4A5E61",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/7/7d/TundraTemplateSkyla.png/revision/latest?cb=20241220163819"
+  },
+  {
+    "name": "Narwhal",
+    "tribe": "IceWing",
+    "main_color": "#CFE3EA",
+    "secondary_color": "#E9F6F8",
+    "accent_color": "#0F5E7C",
+    "eye_color": "#123E50",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/3/39/NarwhalTemplateYSLF.png/revision/latest?cb=20250119200757"
+  },
+  {
+    "name": "Mango",
+    "tribe": "RainWing",
+    "main_color": "#E8791C",
+    "secondary_color": "#F7C24C",
+    "accent_color": "#8D2D1E",
+    "eye_color": "#F0A02A",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/7/7f/MangoTemplateLoopy.png/revision/latest?cb=20260421205807"
+  },
+  {
+    "name": "Magnificent",
+    "tribe": "RainWing",
+    "main_color": "#B51783",
+    "secondary_color": "#D34AB5",
+    "accent_color": "#F3EAF0",
+    "eye_color": "#42B56B",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/1/19/MagnificentTemplateSSE.png/revision/latest?cb=20220101231013"
+  },
+  {
+    "name": "Peacemaker",
+    "tribe": "Hybrid",
+    "main_color": "#050806",
+    "secondary_color": "#14211B",
+    "accent_color": "#2E563B",
+    "eye_color": "#A8B86B",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/4/41/PeacemakerTemplateSSE.png/revision/latest?cb=20210911185109"
+  },
+  {
+    "name": "Lady Jewel",
+    "tribe": "HiveWing",
+    "main_color": "#D8AA1A",
+    "secondary_color": "#F2D95C",
+    "accent_color": "#3A1D08",
+    "eye_color": "#8FAE4A",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/b/bd/JewelTemplateLoopy.png/revision/latest?cb=20260520023159"
+  },
+  {
+    "name": "Lady Scarab",
+    "tribe": "HiveWing",
+    "main_color": "#BCA34B",
+    "secondary_color": "#E8D990",
+    "accent_color": "#171711",
+    "eye_color": "#7B2530",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/0/02/ScarabTemplateSSE.png/revision/latest?cb=20241203015017"
+  },
+  {
+    "name": "Katydid",
+    "tribe": "HiveWing",
+    "main_color": "#D0A000",
+    "secondary_color": "#F0CF22",
+    "accent_color": "#5A2E08",
+    "eye_color": "#273313",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/f/fa/KatydidTemplateSSE.png/revision/latest?cb=20201226224654"
+  },
+  {
+    "name": "Caddele",
+    "tribe": "HiveWing",
+    "main_color": "#C85819",
+    "secondary_color": "#E77B25",
+    "accent_color": "#1B0805",
+    "eye_color": "#6B2E1A",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/a/ad/CadelleTemplateS978.png/revision/latest?cb=20210829061555"
+  },
+  {
+    "name": "Sequoia",
+    "tribe": "LeafWing",
+    "main_color": "#45672D",
+    "secondary_color": "#657833",
+    "accent_color": "#503C20",
+    "eye_color": "#C7D3A0",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/a/a6/SequoiaTemplateS978.png/revision/latest?cb=20251029155600"
+  },
+  {
+    "name": "Pokeweed",
+    "tribe": "LeafWing",
+    "main_color": "#1D2C13",
+    "secondary_color": "#354D22",
+    "accent_color": "#0D1408",
+    "eye_color": "#C4C89A",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/1/12/PokeweedTemplateS978.png/revision/latest?cb=20220406015412"
+  },
+  {
+    "name": "Mulberry",
+    "tribe": "Hybrid",
+    "main_color": "#A81235",
+    "secondary_color": "#E86A2E",
+    "accent_color": "#F2C645",
+    "eye_color": "#7EA84B",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/a/af/MulberryTemplateS978.png/revision/latest?cb=20260304160810"
+  },
+  {
+    "name": "Aurora",
+    "tribe": "Hybrid",
+    "main_color": "#E8B7C5",
+    "secondary_color": "#FFF5F7",
+    "accent_color": "#D9471E",
+    "eye_color": "#87CEEB",
+    "image": ""
+  },
+  {
+    "name": "Borealis",
+    "tribe": "Hybrid",
+    "main_color": "#C8D4E8",
+    "secondary_color": "#FFFFFF",
+    "accent_color": "#E07B3A",
+    "eye_color": "#5A8BC9",
+    "image": ""
+  },
+  {
+    "name": "Quokka",
+    "tribe": "Hybrid",
+    "main_color": "#E98922",
+    "secondary_color": "#F6B14A",
+    "accent_color": "#2B5B63",
+    "eye_color": "#2F9CC2",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/7/7f/QuokkaProfile.png/revision/latest?cb=20260323155004"
+  },
+  {
+    "name": "Platypus",
+    "tribe": "RainWing",
+    "main_color": "#FFB347",
+    "secondary_color": "#FFD78F",
+    "accent_color": "#3A8BC9",
+    "eye_color": "#FFD700",
+    "image": ""
+  },
+  {
+    "name": "Beryl",
+    "tribe": "SkyWing",
+    "main_color": "#7F1D17",
+    "secondary_color": "#C94A22",
+    "accent_color": "#D6A62B",
+    "eye_color": "#F2C94C",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/3/3c/BerylTemplateSkyla.png/revision/latest?cb=20260314095922"
+  },
+  {
+    "name": "Snakeroot",
+    "tribe": "LeafWing",
+    "main_color": "#183322",
+    "secondary_color": "#31583B",
+    "accent_color": "#B87412",
+    "eye_color": "#AFCB7A",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/c/c3/SnakerootTemplateS978.png/revision/latest?cb=20260304160516"
+  },
+  {
+    "name": "Tuatara",
+    "tribe": "WildWing",
+    "main_color": "#7D5A3E",
+    "secondary_color": "#C8A87A",
+    "accent_color": "#3D2A1A",
+    "eye_color": "#9ACD32",
+    "image": ""
+  },
+  {
+    "name": "Horizon",
+    "tribe": "Hybrid",
+    "main_color": "#B8A0C8",
+    "secondary_color": "#E8D8E8",
+    "accent_color": "#FFA07A",
+    "eye_color": "#5A7FA3",
+    "image": ""
+  },
+  {
+    "name": "Monarch",
+    "tribe": "SilkWing",
+    "main_color": "#E77D1A",
+    "secondary_color": "#F4C038",
+    "accent_color": "#1F5F8F",
+    "eye_color": "#6B3A12",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/b/b6/Guide_Portrait_Monarch.jpg/revision/latest?cb=20231010013939"
+  },
+  {
+    "name": "Precipice",
+    "tribe": "SkyWing",
+    "main_color": "#B22222",
+    "secondary_color": "#CD5C5C",
+    "accent_color": "#FFD700",
+    "eye_color": "#FF6347",
+    "image": ""
+  },
+  {
+    "name": "Sky",
+    "tribe": "SkyWing",
+    "main_color": "#D98F62",
+    "secondary_color": "#F2C2B3",
+    "accent_color": "#7A2C22",
+    "eye_color": "#8FC7CF",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/6/6e/SkyTemplateLoopy.png/revision/latest?cb=20260410224742"
+  },
+  {
+    "name": "Wren",
+    "tribe": "Scavenger",
+    "main_color": "#9A5A38",
+    "secondary_color": "#F1D998",
+    "accent_color": "#3A2118",
+    "eye_color": "#5B321F",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/6/67/WrenTopShot.png/revision/latest?cb=20200209055707"
+  },
+  {
+    "name": "Ivy",
+    "tribe": "Scavenger",
+    "main_color": "#B96F3E",
+    "secondary_color": "#E987A7",
+    "accent_color": "#342233",
+    "eye_color": "#3A2217",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/d/d9/IvyTopShot.png/revision/latest?cb=20260120145117"
+  },
+  {
+    "name": "Daffodil",
+    "tribe": "Scavenger",
+    "main_color": "#E8C5A8",
+    "secondary_color": "#FFD78F",
+    "accent_color": "#D9A017",
+    "eye_color": "#4A6B3A",
+    "image": ""
+  },
+  {
+    "name": "Cinnamon",
+    "tribe": "Scavenger",
+    "main_color": "#D2A679",
+    "secondary_color": "#8B4513",
+    "accent_color": "#5C3317",
+    "eye_color": "#3D2612",
+    "image": ""
+  },
+  {
+    "name": "Leaf",
+    "tribe": "Scavenger",
+    "main_color": "#A35A36",
+    "secondary_color": "#EAD28F",
+    "accent_color": "#242018",
+    "eye_color": "#5A2F1D",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/d/db/LeafTopShot.png/revision/latest?cb=20200209055754"
+  },
+  {
+    "name": "Royal",
+    "tribe": "Hybrid",
+    "main_color": "#9B7FB8",
+    "secondary_color": "#E8D8E8",
+    "accent_color": "#D9A24A",
+    "eye_color": "#5A7FA3",
+    "image": ""
+  },
+  {
+    "name": "Dugong",
+    "tribe": "WildWing",
+    "main_color": "#9C4E25",
+    "secondary_color": "#78AA67",
+    "accent_color": "#1F4F58",
+    "eye_color": "#B9D160",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/3/3b/DugongProfile.png/revision/latest?cb=20260501210419"
+  },
+  {
+    "name": "Taipan",
+    "tribe": "WildWing",
+    "main_color": "#66B742",
+    "secondary_color": "#F0BE35",
+    "accent_color": "#0C4051",
+    "eye_color": "#79D7B8",
+    "image": "https://static.wikia.nocookie.net/wingsoffire/images/1/10/TaipanProfile.png/revision/latest?cb=20260323154957"
+  },
+  {
+    "name": "Isa",
+    "tribe": "Hybrid",
+    "main_color": "#E63946",
+    "secondary_color": "#F4A300",
+    "accent_color": "#6A4C93",
+    "eye_color": "#2A9D3F",
+    "image": "images/isa-adult.png"
+  }
+]
