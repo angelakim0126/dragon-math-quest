@@ -201,7 +201,22 @@
     const d = state.difficulty;
     let problemText, answer;
 
-    if (d === 'easy') {
+    if (d === 'times') {
+      // Walk through times tables in order: 2×1, 2×2, …, 2×9, 3×1, …, 10×9, then loop
+      if (!state.timesTable) state.timesTable = 2;
+      if (!state.timesB) state.timesB = 1;
+      const a = state.timesTable;
+      const b = state.timesB;
+      answer = a * b;
+      problemText = `${a} × ${b} = ?`;
+      // Advance for the next problem
+      state.timesB += 1;
+      if (state.timesB > 9) {
+        state.timesB = 1;
+        state.timesTable += 1;
+        if (state.timesTable > 10) state.timesTable = 2;
+      }
+    } else if (d === 'easy') {
       const op = choice(['+', '-']);
       if (op === '+') { const a = randInt(0, 9), b = randInt(0, 10 - a); answer = a + b; problemText = `${a} + ${b} = ?`; }
       else { const a = randInt(2, 10), b = randInt(0, a); answer = a - b; problemText = `${a} − ${b} = ?`; }
@@ -215,23 +230,41 @@
       else if (op === '-') { const a = randInt(20, 99), b = randInt(5, a - 1); answer = a - b; problemText = `${a} − ${b} = ?`; }
       else { const a = randInt(2, 10), b = randInt(2, 10); answer = a * b; problemText = `${a} × ${b} = ?`; }
     } else {
-      // genius — Mathcounts countdown / AMC 8-10 style. Real bench.
-      const kind = choice([
-        // Harder algebra / number theory / combinatorics (higher weight)
-        'alg2step', 'alg2step', 'alg2step',
-        'sum_sqr', 'sum_cube', 'fib',
-        'factor_count', 'factor_count',
-        'big_mult', 'big_mult',
-        'tri_area', 'rect_area_per',
-        'choose_n', 'choose_n',
-        'compound_pct', 'compound_pct',
-        'mod_chain', 'sum_arith_long',
-        'digit_sum', 'lcm_three',
-        'consec_int',
-        // Mixed-difficulty fallbacks (less weight)
-        'square_big', 'cube', 'power2',
-        'percent', 'gcf', 'lcm', 'factorial', 'mixed',
-      ]);
+      // genius — Mathcounts countdown / AMC 8-10 style. Flat weights for variety;
+      // each kind appears equally often so problems don't feel repetitive.
+      const KINDS = [
+        // Algebra & number theory
+        'alg2step', 'algebra3step', 'div_remainder',
+        // Arithmetic series & sequences
+        'sum_sqr', 'sum_cube', 'sum_evens', 'sum_odds',
+        'arith_next', 'geom_next', 'sum_factorials',
+        // Combinatorics
+        'fib', 'choose_n',
+        // Number theory
+        'factor_count', 'lcm_three', 'mod_chain', 'consec_int',
+        // Multiplication / division
+        'big_mult', 'square_big', 'cube',
+        // Geometry
+        'tri_area', 'rect_area_per', 'pythag', 'triangle_perimeter',
+        // Statistics
+        'mean_list', 'median_list', 'count_range', 'count_evens',
+        // Percent
+        'compound_pct', 'percent_inverse',
+        // Exponents
+        'power2', 'power3',
+        // Mixed ops
+        'mixed', 'digit_sum',
+        // Cleanup classics (lower-weighted by appearing once)
+        'gcf', 'lcm', 'factorial', 'percent',
+      ];
+      // Avoid repeating the immediately previous kind for visible variety
+      let kind;
+      let pickAttempts = 0;
+      do {
+        kind = choice(KINDS);
+        pickAttempts++;
+      } while (state.lastGeniusKind && kind === state.lastGeniusKind && pickAttempts < 4);
+      state.lastGeniusKind = kind;
       switch (kind) {
         // ===== Harder kinds =====
         case 'alg2step': {
@@ -420,6 +453,135 @@
           const a = randInt(3, 14), b = randInt(3, 14), c = randInt(3, 14), d = randInt(5, 25);
           answer = a * b + c * d;
           problemText = `${a} × ${b} + ${c} × ${d} = ?`; break;
+        }
+        // ===== New diversifying kinds =====
+        case 'algebra3step': {
+          // (a + bx) / c = d, find x  →  x = (cd - a) / b
+          let a, b, c, d, x;
+          let tries = 0;
+          do {
+            b = randInt(2, 9); x = randInt(2, 14);
+            c = randInt(2, 8); d = randInt(4, 20);
+            a = c * d - b * x;
+            tries++;
+          } while ((a <= 0 || a > 60) && tries < 8);
+          answer = x;
+          problemText = `(${a} + ${b}x) / ${c} = ${d}, x = ?`; break;
+        }
+        case 'div_remainder': {
+          // A / B with quotient & remainder; ask for remainder
+          const b = randInt(4, 13);
+          const q = randInt(5, 30);
+          const r = randInt(1, b - 1);
+          answer = r;
+          problemText = `${b * q + r} ÷ ${b} has remainder ?`; break;
+        }
+        case 'sum_evens': {
+          // 2 + 4 + … + 2n = n(n+1)
+          const n = randInt(5, 18);
+          answer = n * (n + 1);
+          problemText = `2 + 4 + 6 + … + ${2 * n} = ?`; break;
+        }
+        case 'sum_odds': {
+          // 1 + 3 + … + (2n-1) = n²
+          const n = randInt(5, 18);
+          answer = n * n;
+          problemText = `1 + 3 + 5 + … + ${2 * n - 1} = ?`; break;
+        }
+        case 'arith_next': {
+          // arithmetic sequence next term
+          const start = randInt(2, 20);
+          const step = choice([3, 4, 5, 6, 7, 8]);
+          const terms = [start, start + step, start + 2 * step, start + 3 * step];
+          answer = start + 4 * step;
+          problemText = `${terms.join(', ')}, ?`; break;
+        }
+        case 'geom_next': {
+          // geometric sequence next term, ratio 2 or 3
+          const start = choice([2, 3, 4, 5]);
+          const r = choice([2, 3]);
+          const terms = [start, start * r, start * r * r, start * r * r * r];
+          answer = start * Math.pow(r, 4);
+          problemText = `${terms.join(', ')}, ?`; break;
+        }
+        case 'sum_factorials': {
+          // 1! + 2! + … + n!
+          const n = randInt(3, 5);
+          let sum = 0, f = 1;
+          for (let i = 1; i <= n; i++) { f *= i; sum += f; }
+          answer = sum;
+          problemText = `1! + 2! + … + ${n}! = ?`; break;
+        }
+        case 'pythag': {
+          // hypotenuse of a Pythagorean triple
+          const triples = [[3,4,5],[5,12,13],[6,8,10],[7,24,25],[8,15,17],[9,12,15],[9,40,41]];
+          const [a, b, c] = choice(triples);
+          answer = c;
+          problemText = `Hypotenuse of right triangle with legs ${a} and ${b} = ?`; break;
+        }
+        case 'triangle_perimeter': {
+          const sides = choice([[5,12,13],[3,4,5],[6,8,10],[7,7,7],[8,15,17],[6,6,6],[9,12,15]]);
+          answer = sides.reduce((a, b) => a + b, 0);
+          problemText = `Perimeter of triangle with sides ${sides.join(', ')} = ?`; break;
+        }
+        case 'mean_list': {
+          // Mean of a small list with whole answer
+          const n = choice([3, 4, 5]);
+          // Construct numbers around a target mean
+          const mean = randInt(5, 20);
+          const nums = [];
+          for (let i = 0; i < n - 1; i++) nums.push(mean + randInt(-5, 5));
+          const last = mean * n - nums.reduce((s, v) => s + v, 0);
+          nums.push(last);
+          // ensure all positive
+          if (nums.some(v => v <= 0)) { // fallback
+            answer = 10;
+            problemText = `Mean of 8, 10, 12 = ?`; break;
+          }
+          answer = mean;
+          problemText = `Mean of ${nums.join(', ')} = ?`; break;
+        }
+        case 'median_list': {
+          const n = choice([3, 5, 7]);
+          const nums = [];
+          for (let i = 0; i < n; i++) nums.push(randInt(2, 40));
+          nums.sort((a, b) => a - b);
+          answer = nums[(n - 1) / 2];
+          // shuffle for display
+          const display = [...nums].sort(() => Math.random() - 0.5);
+          problemText = `Median of ${display.join(', ')} = ?`; break;
+        }
+        case 'count_range': {
+          const a = randInt(5, 50);
+          const b = a + randInt(8, 40);
+          answer = b - a + 1;
+          problemText = `How many integers from ${a} to ${b}, inclusive?`; break;
+        }
+        case 'count_evens': {
+          const a = randInt(2, 30);
+          const b = a + randInt(10, 50);
+          // count evens in [a, b]
+          let cnt = 0;
+          for (let i = a; i <= b; i++) if (i % 2 === 0) cnt++;
+          answer = cnt;
+          problemText = `How many even integers from ${a} to ${b}?`; break;
+        }
+        case 'percent_inverse': {
+          // X is what % of Y?  answer is a whole percent
+          const wholePcts = [10, 20, 25, 40, 50, 60, 75, 80];
+          const p = choice(wholePcts);
+          const y = randInt(2, 20) * 10;
+          const x = (p * y) / 100;
+          if (!Number.isInteger(x)) { // fallback
+            answer = 25;
+            problemText = `25 is what % of 100?`; break;
+          }
+          answer = p;
+          problemText = `${x} is what % of ${y}?`; break;
+        }
+        case 'power3': {
+          const e = randInt(3, 6);
+          answer = Math.pow(3, e); problemText = `3^${e} = ?`; break;
         }
       }
     }
@@ -623,6 +785,8 @@
     state.activeMath = null;
     state.powerup = null;
     state.screenShake = 0;
+    state.timesTable = 2;
+    state.timesB = 1;
     $('math-banner').classList.remove('active');
     $('math-problem').textContent = 'Math problem coming soon';
     $('math-timer').textContent = '';
@@ -755,7 +919,9 @@
           if (state.activeMath.lastTimerShown !== remain) {
             state.activeMath.lastTimerShown = remain;
             $('math-timer').textContent = remain + 's';
-            $('math-label').textContent = 'Solve to level up';
+            $('math-label').textContent = state.difficulty === 'times'
+              ? 'Times tables practice'
+              : 'Solve to level up';
           }
         }
       }
