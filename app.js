@@ -1177,12 +1177,11 @@
     ctx.arc(tipX, tipY, sparkleSize * 0.4, 0, Math.PI * 2);
     ctx.fill();
 
-    // Skull mark on the bomb body
-    ctx.fillStyle = '#ff3860';
-    ctx.font = `bold ${Math.floor(r * 0.95)}px sans-serif`;
+    // Warning sign on the bomb body — kid-friendly hazard mark, not a skull
+    ctx.font = `bold ${Math.floor(r * 0.85)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('💀', cx, cy + r * 0.15);
+    ctx.fillText('⚠️', cx, cy + r * 0.18);
   }
 
   function drawDragonEntity(o, isPlayer) {
