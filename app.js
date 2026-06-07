@@ -504,56 +504,14 @@
     wrap(state.player);
     if (state.player.vx !== 0) state.player.facingFlipped = state.player.vx < 0;
 
-    // Player motion trail (fire) — only when actually moving
-    const psp = Math.hypot(state.player.vx, state.player.vy);
-    if (psp > 50) {
-      const intensity = Math.min(1, psp / 200);
-      const trailCount = (state.powerup && state.powerup.kind === 'power') ? 3 : Math.random() < 0.7 ? 2 : 1;
-      const trailColors = state.powerup && state.powerup.kind === 'power'
-        ? ['#ff6b35', '#ffd54a', '#ff3860']
-        : state.powerup && state.powerup.kind === 'fly'
-        ? ['#5ec3ff', '#a8d8ff', '#fff']
-        : ['#ffd54a', '#ffb347', '#ff6b35'];
-      for (let k = 0; k < trailCount; k++) {
-        if (Math.random() > intensity) continue;
-        const angBehind = Math.atan2(-state.player.vy, -state.player.vx);
-        const spread = (Math.random() - 0.5) * state.player.size * 0.6;
-        const dist = state.player.size * (0.5 + Math.random() * 0.35);
-        const perpX = -Math.sin(angBehind);
-        const perpY = Math.cos(angBehind);
-        state.particles.push({
-          x: state.player.x + Math.cos(angBehind) * dist + perpX * spread,
-          y: state.player.y + Math.sin(angBehind) * dist + perpY * spread,
-          vx: Math.cos(angBehind) * (1.5 + Math.random() * 1.5),
-          vy: Math.sin(angBehind) * (1.5 + Math.random() * 1.5) - 0.2,
-          color: choice(trailColors),
-          life: 380 + Math.random() * 280,
-          size: state.player.size * (0.1 + Math.random() * 0.12),
-          isTrail: true,
-        });
-      }
-    }
+    // Player motion trail (fire)
+    emitDragonTrail(state.player, /*isPlayer*/ true);
 
-    // Enemy AI
+    // Enemy AI + same flame-trail style, tribe-colored
     for (const o of state.others) {
       if (o.type === 'dragon') {
         updateDragonAI(o, dt);
-        // Light sparkle trail for big enemies — tribe-colored
-        const esp = Math.hypot(o.vx, o.vy);
-        if (esp > 30 && o.size > 32 && Math.random() < 0.15) {
-          const pal = (o.character && TRIBES[o.character.tribe]) || TRIBES.SkyWing;
-          const ang = Math.atan2(-o.vy, -o.vx);
-          state.particles.push({
-            x: o.x + Math.cos(ang) * o.size * 0.55,
-            y: o.y + Math.sin(ang) * o.size * 0.55,
-            vx: Math.cos(ang) * 0.6,
-            vy: Math.sin(ang) * 0.6 - 0.1,
-            color: pal.accent,
-            life: 320 + Math.random() * 200,
-            size: o.size * 0.08 + Math.random() * o.size * 0.05,
-            isTrail: true,
-          });
-        }
+        emitDragonTrail(o, /*isPlayer*/ false);
       } else if (o.type === 'egg' || o.type === 'math' || o.type === 'powerup') {
         if (o.seed !== undefined) {
           o.y += Math.sin(t / 700 + o.seed) * 0.15;
@@ -834,6 +792,44 @@
 
   function shake(a) { state.screenShake = Math.max(state.screenShake, a); }
 
+  function emitDragonTrail(d, isPlayer) {
+    const sp = Math.hypot(d.vx, d.vy);
+    if (sp < 30) return;
+    const intensity = Math.min(1, sp / 200);
+    let colors;
+    if (isPlayer) {
+      colors = state.powerup && state.powerup.kind === 'power'
+        ? ['#ff6b35', '#ffd54a', '#ff3860']
+        : state.powerup && state.powerup.kind === 'fly'
+        ? ['#5ec3ff', '#a8d8ff', '#fff']
+        : ['#ffd54a', '#ffb347', '#ff6b35'];
+    } else {
+      const pal = (d.character && TRIBES[d.character.tribe]) || TRIBES.SkyWing;
+      colors = [pal.accent, pal.main, pal.accent];
+    }
+    // Big & fast → more particles. Player gets a touch more density than enemies.
+    const baseCount = isPlayer ? 2 : 1;
+    const trailCount = baseCount + (Math.random() < intensity * 0.6 ? 1 : 0);
+    for (let k = 0; k < trailCount; k++) {
+      if (Math.random() > intensity) continue;
+      const angBehind = Math.atan2(-d.vy, -d.vx);
+      const spread = (Math.random() - 0.5) * d.size * 0.55;
+      const dist = d.size * (0.5 + Math.random() * 0.35);
+      const perpX = -Math.sin(angBehind);
+      const perpY = Math.cos(angBehind);
+      state.particles.push({
+        x: d.x + Math.cos(angBehind) * dist + perpX * spread,
+        y: d.y + Math.sin(angBehind) * dist + perpY * spread,
+        vx: Math.cos(angBehind) * (1.2 + Math.random() * 1.3),
+        vy: Math.sin(angBehind) * (1.2 + Math.random() * 1.3) - 0.15,
+        color: choice(colors),
+        life: (isPlayer ? 400 : 300) + Math.random() * 240,
+        size: d.size * (0.08 + Math.random() * 0.12),
+        isTrail: true,
+      });
+    }
+  }
+
   function burst(x, y, color, count) {
     for (let i = 0; i < count; i++) {
       const a = Math.random() * Math.PI * 2;
@@ -1042,19 +1038,34 @@
     const img = c && c.image ? loadImage(c.image) : null;
     const flying = isPlayer && state.powerup && state.powerup.kind === 'fly';
     const powered = isPlayer && state.powerup && state.powerup.kind === 'power';
+    const t = performance.now();
 
     ctx.save();
 
     // Drop shadow / glow
     if (isPlayer) {
-      const glow = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.size * 1.6);
-      const glowCol = powered ? 'rgba(255, 107, 53, 0.55)' : flying ? 'rgba(94, 195, 255, 0.55)' : 'rgba(255, 213, 74, 0.5)';
-      glow.addColorStop(0, glowCol);
-      glow.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = glow;
+      // Stronger, pulsing player halo so it stands out
+      const pulse = 1 + Math.sin(t / 250) * 0.18;
+      const haloR = o.size * 2.0 * pulse;
+      const outer = ctx.createRadialGradient(o.x, o.y, o.size * 0.7, o.x, o.y, haloR);
+      const glowCol = powered ? 'rgba(255, 107, 53, 0.75)' : flying ? 'rgba(94, 195, 255, 0.75)' : 'rgba(255, 213, 74, 0.7)';
+      outer.addColorStop(0, glowCol);
+      outer.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = outer;
       ctx.beginPath();
-      ctx.arc(o.x, o.y, o.size * 1.6, 0, Math.PI * 2);
+      ctx.arc(o.x, o.y, haloR, 0, Math.PI * 2);
       ctx.fill();
+
+      // Inner crisp ring outline so player is always visible against dark/busy bg
+      ctx.save();
+      ctx.strokeStyle = powered ? '#ff6b35' : flying ? '#5ec3ff' : '#ffd54a';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = ctx.strokeStyle;
+      ctx.shadowBlur = 12 + Math.sin(t / 250) * 4;
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, o.size * (1.08 + Math.sin(t / 350) * 0.04), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
     } else {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
       ctx.beginPath();
@@ -1100,9 +1111,73 @@
       ctx.beginPath();
       ctx.arc(o.x, o.y, o.size, 0, Math.PI * 2);
       ctx.fill();
+      ctx.globalAlpha = 1;
     }
 
-    ctx.globalAlpha = 1;
+    // Player overlay: orbiting sparkles + "YOU" pointer
+    if (isPlayer) {
+      const t = performance.now();
+      const orbitR = o.size * 1.25;
+      const sparkleCount = 4;
+      for (let i = 0; i < sparkleCount; i++) {
+        const ang = (t / 700) + (i * Math.PI * 2 / sparkleCount);
+        const sx = o.x + Math.cos(ang) * orbitR;
+        const sy = o.y + Math.sin(ang) * orbitR;
+        const sSize = 3 + Math.sin(t / 200 + i) * 1.5;
+        // 4-point star
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(t / 400);
+        const starGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, sSize * 3);
+        starGrad.addColorStop(0, '#fff4d1');
+        starGrad.addColorStop(0.5, 'rgba(255, 213, 74, 0.7)');
+        starGrad.addColorStop(1, 'rgba(255, 213, 74, 0)');
+        ctx.fillStyle = starGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, sSize * 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.moveTo(0, -sSize);
+        ctx.lineTo(sSize * 0.35, -sSize * 0.35);
+        ctx.lineTo(sSize, 0);
+        ctx.lineTo(sSize * 0.35, sSize * 0.35);
+        ctx.lineTo(0, sSize);
+        ctx.lineTo(-sSize * 0.35, sSize * 0.35);
+        ctx.lineTo(-sSize, 0);
+        ctx.lineTo(-sSize * 0.35, -sSize * 0.35);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // "YOU" arrow indicator floating above the player
+      const arrowY = o.y - o.size - 18 - Math.sin(t / 350) * 4;
+      const arrowX = o.x;
+      ctx.save();
+      ctx.font = `bold 14px Georgia, serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#1a0b2e';
+      ctx.strokeStyle = '#1a0b2e';
+      ctx.lineWidth = 4;
+      ctx.strokeText('YOU', arrowX, arrowY);
+      ctx.fillStyle = '#ffd54a';
+      ctx.fillText('YOU', arrowX, arrowY);
+      // little down-arrow under the label
+      ctx.fillStyle = '#ffd54a';
+      ctx.strokeStyle = '#1a0b2e';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(arrowX - 5, arrowY + 8);
+      ctx.lineTo(arrowX + 5, arrowY + 8);
+      ctx.lineTo(arrowX, arrowY + 14);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
     ctx.restore();
   }
 
