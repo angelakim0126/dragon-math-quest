@@ -742,13 +742,42 @@
     if (state.powerup) {
       const remain = state.powerup.endsAt - t;
       if (remain <= 0) {
+        const endingFly = state.powerup.kind === 'fly';
         state.powerup = null;
         powerupBanner.classList.add('hidden');
+        if (endingFly) {
+          // Push any dragons currently overlapping the player far enough away
+          // that the player isn't insta-killed when invulnerability ends
+          for (const o of state.others) {
+            if (o.type !== 'dragon') continue;
+            const dx = o.x - state.player.x;
+            const dy = o.y - state.player.y;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const need = state.player.size + o.size + 30;
+            if (dist < need) {
+              const nx = dx / dist, ny = dy / dist;
+              o.x = state.player.x + nx * need;
+              o.y = state.player.y + ny * need;
+              wrap(o);
+            }
+          }
+          // 1.2-second post-fly invulnerability so Iris has time to escape
+          state.invulnerableUntil = t + 1200;
+        }
       } else {
         powerupTimer.textContent = Math.ceil(remain / 1000);
       }
     }
 
+    // Cap trail particles (under heavy enemy/player movement they pile up
+    // and can cost frame time, especially with additive gradients)
+    if (state.particles.length > 180) {
+      // Drop the oldest trail particles first
+      const trails = state.particles.filter(p => p.isTrail).sort((a, b) => a.life - b.life);
+      const cutCount = state.particles.length - 180;
+      const cut = new Set(trails.slice(0, cutCount));
+      state.particles = state.particles.filter(p => !cut.has(p));
+    }
     // Particles
     state.particles = state.particles.filter(p => {
       p.life -= 16;
@@ -837,10 +866,16 @@
     const biggerThanPlayer = d.size > player.size + EAT_BUFFER;
     const smallerThanPlayer = d.size + EAT_BUFFER < player.size;
     const powered = state.powerup && state.powerup.kind === 'power';
+    const playerFlying = state.powerup && state.powerup.kind === 'fly';
 
     if (d.turnCooldown <= 0) {
       d.turnCooldown = 700 + Math.random() * 800;
       const speedMult = getLevel().speedMult;
+      // While the player is in Fly mode, every dragon loses interest in them and
+      // hunts eggs / wanders instead. Prevents pile-ups around the flying player.
+      if (playerFlying) {
+        // fall through to egg-hunting / wander branch
+      } else
       if (biggerThanPlayer && !powered && dToPlayer < 220) {
         const sp = ENEMY_BASE_SPEED * 0.75 * speedMult;
         d.vx = (dx / dToPlayer) * sp;
@@ -901,6 +936,7 @@
     const player = state.player;
     const flying = state.powerup && state.powerup.kind === 'fly';
     const powered = state.powerup && state.powerup.kind === 'power';
+    const invulnerable = state.invulnerableUntil && performance.now() < state.invulnerableUntil;
 
     const toRemove = new Set();
 
@@ -920,24 +956,20 @@
         burst(o.x, o.y, o.kind === 'fly' ? '#5ec3ff' : o.kind === 'power' ? '#ff6b35' : '#ffd54a', 30);
         toRemove.add(o);
       } else if (o.type === 'dragon') {
-        if (flying) {
-          // Fly mode: phase through every dragon — no bounce, no death
+        if (flying || invulnerable) {
           continue;
         }
         if (powered || player.size > o.size + EAT_BUFFER) {
-          // eat smaller dragon
           eatDragon(o);
           toRemove.add(o);
         } else if (o.size > player.size + EAT_BUFFER) {
           gameOver(`A bigger ${o.character ? o.character.name : 'dragon'} ate you!`);
           return;
         } else {
-          // bounce off similarly-sized dragons
           bounce(player, o);
         }
       } else if (o.type === 'bomb') {
-        if (flying) {
-          // phase through bombs while flying — bomb still alive
+        if (flying || invulnerable) {
           continue;
         }
         bombExplode(o);
