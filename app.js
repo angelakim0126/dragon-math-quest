@@ -526,7 +526,9 @@
     state.player.x += state.player.vx * dt;
     state.player.y += state.player.vy * dt;
     wrap(state.player);
-    if (state.player.vx !== 0) state.player.facingFlipped = state.player.vx < 0;
+    // WoF canon art faces left by default — flip when moving right so the dragon
+    // looks toward its movement direction
+    if (state.player.vx !== 0) state.player.facingFlipped = state.player.vx > 0;
 
     // Player motion trail (fire)
     emitDragonTrail(state.player, /*isPlayer*/ true);
@@ -707,7 +709,7 @@
     d.x += d.vx * dt;
     d.y += d.vy * dt;
     wrap(d);
-    if (d.vx !== 0) d.facingFlipped = d.vx < 0;
+    if (d.vx !== 0) d.facingFlipped = d.vx > 0;
   }
 
   function handleCollisions() {
