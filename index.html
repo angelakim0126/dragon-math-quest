@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
   <meta name="googlebot" content="noindex, nofollow">
   <title>Iris Juliet's Dragon Math Quest</title>
-  <link rel="stylesheet" href="styles.css?v=17">
+  <link rel="stylesheet" href="styles.css?v=18">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🐉%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -106,8 +106,12 @@
         <span class="hud-label">Best</span>
         <span id="hud-best" class="hud-value">0</span>
       </div>
+      <div class="hud-item hud-timer-item">
+        <span class="hud-label">Time Left</span>
+        <span id="hud-timer" class="hud-value">5:00</span>
+      </div>
       <button id="mute-btn" class="hud-btn" aria-label="Mute music">🔊</button>
-      <button id="pause-btn" class="hud-btn" aria-label="Pause">⏸</button>
+      <button id="pause-btn" class="hud-btn hud-btn-pause" aria-label="Pause (Space)" title="Pause (Space or P)">⏸ Pause</button>
     </div>
 
     <div id="math-banner" class="math-banner">
@@ -130,6 +134,20 @@
 
     <div class="controls-hint">
       <p>Move with <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd>, WASD, or drag on the screen</p>
+    </div>
+  </section>
+
+  <!-- ===== LOCK SCREEN (5-min parental lock) ===== -->
+  <section id="lock-screen" class="screen overlay">
+    <div class="screen-inner">
+      <h2>⏰ Time's up!</h2>
+      <p class="lock-msg">You've played for 5 minutes.<br>Ask a grown-up to enter the password.</p>
+      <div class="lock-input-row">
+        <input id="lock-input" type="password" placeholder="Parent password" autocomplete="off">
+        <button id="lock-btn" class="big-btn">Unlock</button>
+      </div>
+      <p id="lock-error" class="lock-error"></p>
+      <p class="lock-note">The timer resets after unlocking.</p>
     </div>
   </section>
 
@@ -184,6 +202,6 @@
     </p>
   </footer>
 
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>

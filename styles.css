@@ -326,14 +326,95 @@ h1 .crown {
 }
 
 .hud-btn {
-  margin-left: auto;
   padding: 0.4rem 0.8rem;
   background: rgba(255, 213, 74, 0.15);
   border: 1px solid var(--panel-border);
   border-radius: 10px;
   color: var(--gold);
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   cursor: pointer;
+  font-family: inherit;
+}
+
+.hud-btn:first-of-type { margin-left: auto; }
+
+.hud-btn-pause {
+  font-weight: 700;
+  background: linear-gradient(135deg, rgba(255, 213, 74, 0.3), rgba(255, 107, 53, 0.25));
+  border-color: var(--gold);
+  font-size: 0.95rem;
+}
+
+.hud-btn-pause:hover {
+  background: linear-gradient(135deg, rgba(255, 213, 74, 0.5), rgba(255, 107, 53, 0.4));
+}
+
+.hud-timer-item .hud-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-timer-item .hud-value.low {
+  color: var(--danger);
+  animation: timer-low-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes timer-low-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+/* ===== Lock screen ===== */
+#lock-screen .screen-inner {
+  max-width: 480px;
+}
+#lock-screen h2 {
+  font-family: var(--serif);
+  font-size: clamp(2rem, 6vw, 2.8rem);
+  background: linear-gradient(135deg, var(--fire), var(--gold));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0 0 1rem;
+}
+.lock-msg {
+  color: var(--text-soft);
+  font-size: 1.05rem;
+  line-height: 1.55;
+  margin: 0 0 1.4rem;
+}
+.lock-input-row {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 0.8rem;
+}
+#lock-input {
+  flex: 1;
+  max-width: 220px;
+  padding: 0.7rem 1rem;
+  background: var(--panel);
+  border: 2px solid var(--panel-border);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 1rem;
+  font-family: inherit;
+}
+#lock-input:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(255, 213, 74, 0.18);
+}
+.lock-error {
+  color: var(--danger);
+  font-size: 0.92rem;
+  min-height: 1.2em;
+  margin: 0.3rem 0;
+}
+.lock-note {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-style: italic;
+  margin: 1.2rem 0 0;
 }
 
 .math-banner {
@@ -743,6 +824,17 @@ h1 .crown {
   border-color: var(--gold);
   box-shadow: 0 0 20px rgba(255, 213, 74, 0.5), inset 0 0 12px rgba(255, 213, 74, 0.12);
   background: linear-gradient(135deg, rgba(255, 213, 74, 0.18), rgba(178, 102, 255, 0.12));
+}
+
+.player-img-wrap {
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
 }
 
 .player-card img {

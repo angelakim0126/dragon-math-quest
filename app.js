@@ -40,14 +40,19 @@
   const BOMB_INTERVAL_MS = 11000;
   const MAX_BOMBS = 2;
   const GIANT_CHANCE = 0.12; // post-grace chance an enemy is a giant
-  const GIANT_SIZE_MIN = 120;
-  const GIANT_SIZE_MAX = 175;
+  const GIANT_SIZE_MIN = 90;
+  const GIANT_SIZE_MAX = 120;
 
   // ===== Leaderboard =====
   const LB_KEY = 'dmq_leaderboard_v1';
   const LB_NAME_KEY = 'dmq_player_name';
   const LB_SIZE = 10;
   const UNLOCK_KEY = 'dmq_unlocked_level_v1';
+
+  // Parental play-time limit (Iris-only — son's AMC sessions can be longer)
+  const PLAY_TIME_LIMIT_MS = 5 * 60 * 1000;
+  const PLAY_TIME_KEY = 'dmq_play_time_ms_v1';
+  const PARENT_PASSWORD = 'myloveiris';
 
   // ===== Levels (each has its own map + difficulty tuning) =====
   // unlockScore: score needed on the previous level to unlock this one
@@ -187,6 +192,8 @@
     if (!url) return null;
     if (imgCache.has(url)) return imgCache.get(url);
     const img = new Image();
+    img._loadFailed = false;
+    img.onerror = () => { img._loadFailed = true; };
     img.src = url;
     imgCache.set(url, img);
     return img;
@@ -715,7 +722,8 @@
       // smaller-than-player path
       size = playerSize - randInt(8, 22) - Math.random() * 6;
     } else {
-      size = playerSize + randInt(12, 34) + Math.random() * 10;
+      // bigger-than-player but capped tighter so the canvas doesn't get crowded
+      size = playerSize + randInt(10, 22) + Math.random() * 6;
     }
     size = Math.max(14, Math.min(GIANT_SIZE_MAX, size));
     const p = randomEmptyPosition(size);
@@ -829,6 +837,16 @@
 
   // ===== Game start =====
   function startGame() {
+    // If the play-time limit was already reached, immediately lock instead of
+    // letting the game start. The parent has to enter the password first.
+    if ((Number(localStorage.getItem(PLAY_TIME_KEY) || 0)) >= PLAY_TIME_LIMIT_MS) {
+      state.running = true;
+      state.paused = true;
+      showScreen('game-screen');
+      sizeCanvas();
+      lockGameForParent();
+      return;
+    }
     state.running = true;
     state.paused = false;
     state.score = 0;
@@ -841,6 +859,8 @@
     state.timesTable = 2;
     state.timesB = 1;
     state.xp = 0;
+    state.locked = false;
+    state.lastSavedPlayMs = state.playTimeMs || 0;
     $('math-banner').classList.remove('active');
     $('math-problem').textContent = 'Math problem coming soon';
     $('math-timer').textContent = '';
@@ -906,6 +926,32 @@
 
     const dt = Math.min(0.05, (t - state.lastFrame) / 1000);
     state.lastFrame = t;
+
+    // Parental play-time tracking — only counts while actually playing
+    state.playTimeMs = (state.playTimeMs || 0) + dt * 1000;
+    if (state.playTimeMs - (state.lastSavedPlayMs || 0) > 4000) {
+      localStorage.setItem(PLAY_TIME_KEY, String(Math.floor(state.playTimeMs)));
+      state.lastSavedPlayMs = state.playTimeMs;
+    }
+    if (state.playTimeMs >= PLAY_TIME_LIMIT_MS && !state.locked) {
+      lockGameForParent();
+      state.rafId = requestAnimationFrame(loop);
+      return;
+    }
+    // Update timer HUD readout once per second
+    const remainMs = Math.max(0, PLAY_TIME_LIMIT_MS - state.playTimeMs);
+    const remainSec = Math.ceil(remainMs / 1000);
+    if (state.lastTimerShown !== remainSec) {
+      state.lastTimerShown = remainSec;
+      const mm = Math.floor(remainSec / 60);
+      const ss = remainSec % 60;
+      const txt = `${mm}:${String(ss).padStart(2, '0')}`;
+      const hudTimer = $('hud-timer');
+      if (hudTimer) {
+        hudTimer.textContent = txt;
+        hudTimer.classList.toggle('low', remainSec <= 60);
+      }
+    }
 
     // Player control
     updatePlayerDirection();
@@ -1283,6 +1329,44 @@
     burst(b.x, b.y, '#ffd54a', 35);
     burst(b.x, b.y, '#ff6b35', 35);
     burst(b.x, b.y, '#1a0b2e', 25);
+  }
+
+  function lockGameForParent() {
+    state.locked = true;
+    state.paused = true;
+    Music.stop();
+    localStorage.setItem(PLAY_TIME_KEY, String(Math.floor(state.playTimeMs)));
+    const ls = $('lock-screen');
+    if (ls) {
+      ls.classList.add('active');
+      const errEl = $('lock-error');
+      if (errEl) errEl.textContent = '';
+      const inp = $('lock-input');
+      if (inp) {
+        inp.value = '';
+        setTimeout(() => inp.focus(), 100);
+      }
+    }
+  }
+
+  function tryUnlockGame() {
+    const inp = $('lock-input');
+    const errEl = $('lock-error');
+    if (!inp) return;
+    if (inp.value === PARENT_PASSWORD) {
+      // Reset the play-time counter
+      state.playTimeMs = 0;
+      state.lastSavedPlayMs = 0;
+      localStorage.setItem(PLAY_TIME_KEY, '0');
+      state.locked = false;
+      state.paused = false;
+      $('lock-screen').classList.remove('active');
+      if (state.running) Music.start();
+    } else {
+      if (errEl) errEl.textContent = "That's not the right password.";
+      inp.value = '';
+      inp.focus();
+    }
   }
 
   function smokePoof(x, y, radius) {
@@ -2757,7 +2841,8 @@
 
     if (flying) ctx.globalAlpha = 0.6;
 
-    if (img && img.complete && img.naturalWidth > 0) {
+    const imageReady = img && img.complete && !img._loadFailed && img.naturalWidth >= 16;
+    if (imageReady) {
       // Image draw — keep aspect ratio, fit inside bounding circle
       const aspect = img.naturalWidth / img.naturalHeight;
       let w = o.size * 2.2, h = w / aspect;
@@ -2903,23 +2988,114 @@
 
   function drawDragonFallback(o) {
     const pal = (o.character && TRIBES[o.character.tribe]) || TRIBES.SkyWing;
-    const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.size);
-    g.addColorStop(0, pal.accent);
-    g.addColorStop(0.6, pal.main);
-    g.addColorStop(1, '#1a0b2e');
-    ctx.fillStyle = g;
+    const r = o.size * 0.9;
+
+    // Body — oval with radial gradient
+    const bodyGrad = ctx.createRadialGradient(o.x - r * 0.2, o.y - r * 0.2, 0, o.x, o.y, r * 1.1);
+    bodyGrad.addColorStop(0, pal.accent);
+    bodyGrad.addColorStop(0.6, pal.main);
+    bodyGrad.addColorStop(1, '#1a0b2e');
+    ctx.fillStyle = bodyGrad;
     ctx.beginPath();
-    ctx.arc(o.x, o.y, o.size, 0, Math.PI * 2);
+    ctx.ellipse(o.x, o.y, r * 1.05, r * 0.78, 0, 0, Math.PI * 2);
     ctx.fill();
-    // eye
+
+    // Belly highlight
+    ctx.fillStyle = `rgba(255, 255, 255, 0.18)`;
+    ctx.beginPath();
+    ctx.ellipse(o.x - r * 0.1, o.y + r * 0.25, r * 0.55, r * 0.32, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Wing (back, fanned out behind the body)
+    ctx.fillStyle = pal.accent;
+    ctx.beginPath();
+    ctx.moveTo(o.x - r * 0.2, o.y - r * 0.1);
+    ctx.quadraticCurveTo(o.x - r * 0.6, o.y - r * 0.95, o.x - r * 1.05, o.y - r * 0.35);
+    ctx.quadraticCurveTo(o.x - r * 0.7, o.y - r * 0.4, o.x - r * 0.2, o.y - r * 0.1);
+    ctx.closePath();
+    ctx.fill();
+    // Wing inner shading
+    ctx.fillStyle = `rgba(0, 0, 0, 0.18)`;
+    ctx.beginPath();
+    ctx.moveTo(o.x - r * 0.25, o.y - r * 0.15);
+    ctx.quadraticCurveTo(o.x - r * 0.55, o.y - r * 0.7, o.x - r * 0.85, o.y - r * 0.35);
+    ctx.quadraticCurveTo(o.x - r * 0.55, o.y - r * 0.42, o.x - r * 0.25, o.y - r * 0.15);
+    ctx.closePath();
+    ctx.fill();
+
+    // Tail — curling out behind
+    ctx.strokeStyle = pal.main;
+    ctx.lineWidth = r * 0.18;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(o.x - r * 0.9, o.y + r * 0.15);
+    ctx.quadraticCurveTo(o.x - r * 1.35, o.y + r * 0.55, o.x - r * 1.5, o.y + r * 0.2);
+    ctx.stroke();
+    // Tail spike
+    ctx.fillStyle = pal.accent;
+    ctx.beginPath();
+    ctx.moveTo(o.x - r * 1.5, o.y + r * 0.2);
+    ctx.lineTo(o.x - r * 1.75, o.y + r * 0.1);
+    ctx.lineTo(o.x - r * 1.55, o.y + r * 0.4);
+    ctx.closePath();
+    ctx.fill();
+
+    // Head (faces right)
+    const hx = o.x + r * 0.7, hy = o.y - r * 0.12;
+    const headGrad = ctx.createRadialGradient(hx - r * 0.08, hy - r * 0.1, 0, hx, hy, r * 0.55);
+    headGrad.addColorStop(0, pal.accent);
+    headGrad.addColorStop(0.8, pal.main);
+    ctx.fillStyle = headGrad;
+    ctx.beginPath();
+    ctx.ellipse(hx, hy, r * 0.55, r * 0.45, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Snout
+    ctx.fillStyle = pal.main;
+    ctx.beginPath();
+    ctx.ellipse(hx + r * 0.4, hy + r * 0.08, r * 0.28, r * 0.18, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Horns
+    ctx.fillStyle = pal.accent;
+    ctx.beginPath();
+    ctx.moveTo(hx - r * 0.05, hy - r * 0.4);
+    ctx.lineTo(hx - r * 0.25, hy - r * 0.7);
+    ctx.lineTo(hx + r * 0.1, hy - r * 0.35);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(hx + r * 0.25, hy - r * 0.35);
+    ctx.lineTo(hx + r * 0.18, hy - r * 0.65);
+    ctx.lineTo(hx + r * 0.4, hy - r * 0.3);
+    ctx.closePath();
+    ctx.fill();
+
+    // Eye
     ctx.fillStyle = 'white';
     ctx.beginPath();
-    ctx.arc(o.x + o.size * 0.3, o.y - o.size * 0.2, o.size * 0.15, 0, Math.PI * 2);
+    ctx.arc(hx + r * 0.18, hy - r * 0.1, r * 0.13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = pal.eye;
+    ctx.beginPath();
+    ctx.arc(hx + r * 0.22, hy - r * 0.1, r * 0.08, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#000';
     ctx.beginPath();
-    ctx.arc(o.x + o.size * 0.35, o.y - o.size * 0.2, o.size * 0.07, 0, Math.PI * 2);
+    ctx.arc(hx + r * 0.24, hy - r * 0.1, r * 0.04, 0, Math.PI * 2);
     ctx.fill();
+    // Eye shine
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.arc(hx + r * 0.26, hy - r * 0.13, r * 0.02, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Friendly smile curve
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.lineWidth = Math.max(1, r * 0.04);
+    ctx.beginPath();
+    ctx.moveTo(hx + r * 0.3, hy + r * 0.18);
+    ctx.quadraticCurveTo(hx + r * 0.5, hy + r * 0.28, hx + r * 0.62, hy + r * 0.18);
+    ctx.stroke();
   }
 
   function drawEgg(o) {
@@ -3089,13 +3265,18 @@
   function renderPlayerPicker() {
     const container = $('player-picker');
     if (!container || PLAYER_CHARS.length === 0) return;
-    container.innerHTML = PLAYER_CHARS.map((c, i) => `
+    container.innerHTML = PLAYER_CHARS.map((c, i) => {
+      const pal = TRIBES[c.tribe] || TRIBES.SkyWing;
+      const grad = `linear-gradient(135deg, ${pal.accent}, ${pal.main})`;
+      return `
       <button class="player-card${i === state.chosenCharIndex ? ' selected' : ''}" data-i="${i}" aria-label="${escapeHtml(c.name)}">
-        <img src="${escapeHtml(c.image)}" alt="" loading="lazy">
+        <span class="player-img-wrap" style="background:${grad}">
+          <img src="${escapeHtml(c.image)}" alt="" loading="lazy" onerror="this.style.display='none'">
+        </span>
         <span class="player-name">${escapeHtml(c.name)}</span>
         <span class="player-tribe">${escapeHtml(c.tribe || '')}</span>
-      </button>
-    `).join('');
+      </button>`;
+    }).join('');
     container.querySelectorAll('.player-card').forEach(btn => {
       btn.addEventListener('click', () => {
         state.chosenCharIndex = Number(btn.dataset.i);
@@ -3116,6 +3297,12 @@
     Music.toggleMute();
     refreshMuteButton();
   });
+  if ($('lock-btn')) {
+    $('lock-btn').addEventListener('click', tryUnlockGame);
+    $('lock-input').addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); tryUnlockGame(); }
+    });
+  }
   $('quit-btn').addEventListener('click', () => {
     state.running = false;
     cancelAnimationFrame(state.rafId);
@@ -3299,6 +3486,9 @@
   // ===== Init =====
   loadUnlockedLevel();
   state.levelId = Math.min(state.levelId, state.unlockedLevel);
+  // Restore cumulative play time from localStorage
+  state.playTimeMs = Number(localStorage.getItem(PLAY_TIME_KEY) || 0);
+  state.lastSavedPlayMs = state.playTimeMs;
   hudBest.textContent = getTopScore();
   pickDifficulty('hard');
   renderStartLeaderboard();
