@@ -878,6 +878,8 @@
     sizeCanvas();
     hudBest.textContent = getTopScore();
     updateHud();
+    Music.start();
+    refreshMuteButton();
 
     cancelAnimationFrame(state.rafId);
     state.rafId = requestAnimationFrame(loop);
@@ -1395,6 +1397,7 @@
   function gameOver(reason) {
     state.running = false;
     cancelAnimationFrame(state.rafId);
+    Music.stop();
 
     // Check if a new level unlocks
     const nextLevel = LEVELS[state.levelId + 1];
@@ -3109,9 +3112,14 @@
   $('start-btn').addEventListener('click', startGame);
   $('pause-btn').addEventListener('click', togglePause);
   $('resume-btn').addEventListener('click', togglePause);
+  $('mute-btn').addEventListener('click', () => {
+    Music.toggleMute();
+    refreshMuteButton();
+  });
   $('quit-btn').addEventListener('click', () => {
     state.running = false;
     cancelAnimationFrame(state.rafId);
+    Music.stop();
     pauseScreen.classList.remove('active');
     renderStartLeaderboard();
     showScreen('start-screen');
@@ -3122,6 +3130,7 @@
   });
   $('home-btn').addEventListener('click', () => {
     gameoverScreen.classList.remove('active');
+    Music.stop();
     renderStartLeaderboard();
     showScreen('start-screen');
   });
@@ -3169,6 +3178,124 @@
     requestAnimationFrame(previewLoop);
   }
 
+  // ===== Background music (Web Audio synth, no external file) =====
+  const Music = (() => {
+    const MUTE_KEY = 'dmq_music_muted';
+    let actx = null, master = null;
+    let scheduler = null;
+    let muted = localStorage.getItem(MUTE_KEY) === '1';
+    let baseVol = 0.07;
+    let active = false;
+    let loopIndex = 0;
+
+    // Two short looping pieces — alternate so it doesn't feel monotonous.
+    // Each row is one chord (4 eighth-notes melody) + a bass note.
+    // MIDI: A4=69, C5=72, etc.
+    // Loop A: Am - F - C - G (axis-of-awesome, adventurous)
+    const LOOP_A = {
+      melody: [
+        [69, 72, 76, 72], // Am: A C E C
+        [65, 69, 72, 69], // F:  F A C A
+        [60, 64, 67, 64], // C:  C E G E
+        [62, 67, 71, 67], // G:  D G B G
+      ],
+      bass: [45, 41, 36, 43], // A2 F2 C2 G2
+    };
+    // Loop B: Am - G - F - E (descending, slightly more dramatic)
+    const LOOP_B = {
+      melody: [
+        [69, 72, 76, 79], // Am: A C E A
+        [67, 71, 74, 71], // G:  G B D B
+        [65, 69, 72, 69], // F:  F A C A
+        [64, 68, 71, 68], // E:  E G# B G#
+      ],
+      bass: [45, 43, 41, 40], // A2 G2 F2 E2
+    };
+    const LOOPS = [LOOP_A, LOOP_B];
+
+    function ensureCtx() {
+      if (!actx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return false;
+        actx = new AC();
+        master = actx.createGain();
+        master.gain.value = muted ? 0 : baseVol;
+        master.connect(actx.destination);
+      }
+      if (actx.state === 'suspended') actx.resume();
+      return true;
+    }
+
+    function noteFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+
+    function playTone(midi, when, duration, type, vol) {
+      const osc = actx.createOscillator();
+      const g = actx.createGain();
+      osc.type = type;
+      osc.frequency.value = noteFreq(midi);
+      osc.connect(g);
+      g.connect(master);
+      g.gain.setValueAtTime(0, when);
+      g.gain.linearRampToValueAtTime(vol, when + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, when + duration);
+      osc.start(when);
+      osc.stop(when + duration + 0.05);
+    }
+
+    function scheduleLoop() {
+      if (!active || !actx) return;
+      const piece = LOOPS[loopIndex % LOOPS.length];
+      loopIndex++;
+      const beat = 0.32; // ~94 bpm
+      const chordDur = beat * 4;
+      let t = actx.currentTime + 0.05;
+      for (let c = 0; c < piece.melody.length; c++) {
+        const chordNotes = piece.melody[c];
+        // Bass note — soft sine
+        playTone(piece.bass[c], t, chordDur - 0.03, 'sine', 0.32);
+        // Chord pad — even softer, an octave above the bass
+        playTone(piece.bass[c] + 12, t, chordDur - 0.03, 'sine', 0.10);
+        // Melody arpeggios — bright triangle
+        for (let i = 0; i < chordNotes.length; i++) {
+          playTone(chordNotes[i], t + i * beat, beat * 1.6, 'triangle', 0.18);
+        }
+        t += chordDur;
+      }
+      const loopDur = chordDur * piece.melody.length;
+      scheduler = setTimeout(scheduleLoop, loopDur * 1000 - 50);
+    }
+
+    function start() {
+      if (active) return;
+      if (!ensureCtx()) return;
+      active = true;
+      scheduleLoop();
+    }
+    function stop() {
+      active = false;
+      if (scheduler) clearTimeout(scheduler);
+      scheduler = null;
+    }
+    function toggleMute() {
+      muted = !muted;
+      localStorage.setItem(MUTE_KEY, muted ? '1' : '0');
+      if (master) master.gain.value = muted ? 0 : baseVol;
+      return muted;
+    }
+    return {
+      start, stop, toggleMute,
+      get isMuted() { return muted; },
+    };
+  })();
+
+  // Hook music into the lifecycle
+  function refreshMuteButton() {
+    const btn = $('mute-btn');
+    if (!btn) return;
+    btn.textContent = Music.isMuted ? '🔇' : '🔊';
+    btn.setAttribute('aria-label', Music.isMuted ? 'Unmute music' : 'Mute music');
+  }
+
   // ===== Init =====
   loadUnlockedLevel();
   state.levelId = Math.min(state.levelId, state.unlockedLevel);
@@ -3178,5 +3305,6 @@
   renderLevelPicker();
   loadCharacters();
   previewLoop();
+  refreshMuteButton();
 
 })();
