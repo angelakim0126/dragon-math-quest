@@ -32,8 +32,10 @@
   const MATH_FIRST_DELAY_MS = 7000;
   const MATH_INTERVAL_MS = 14000;
   const MATH_ANSWER_TIMEOUT_MS = 22000;
+  const MATH_ANSWER_TIMEOUT_GENIUS_MS = 12000; // countdown round pace
   const POWERUP_INTERVAL_MS = 16000;
   const POWERUP_DURATION_MS = 8000;
+  const GRACE_PERIOD_MS = 8000; // no big dragons until this elapses
 
   // ===== Leaderboard =====
   const LB_KEY = 'dmq_leaderboard_v1';
@@ -140,36 +142,151 @@
   function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
   function choice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
+  // GCF / LCM helpers
+  function gcd(a, b) { while (b) { [a, b] = [b, a % b]; } return a; }
+  function lcm(a, b) { return (a * b) / gcd(a, b); }
+
   function makeMathProblem() {
     const d = state.difficulty;
-    let a, b, op, answer;
+    let problemText, answer;
 
     if (d === 'easy') {
-      op = choice(['+', '-']);
-      if (op === '+') { a = randInt(0, 9); b = randInt(0, 10 - a); answer = a + b; }
-      else { a = randInt(2, 10); b = randInt(0, a); answer = a - b; }
+      const op = choice(['+', '-']);
+      if (op === '+') { const a = randInt(0, 9), b = randInt(0, 10 - a); answer = a + b; problemText = `${a} + ${b} = ?`; }
+      else { const a = randInt(2, 10), b = randInt(0, a); answer = a - b; problemText = `${a} − ${b} = ?`; }
     } else if (d === 'medium') {
-      op = choice(['+', '-']);
-      if (op === '+') { a = randInt(2, 18); b = randInt(1, 20 - a); answer = a + b; }
-      else { a = randInt(5, 20); b = randInt(1, a); answer = a - b; }
+      const op = choice(['+', '-']);
+      if (op === '+') { const a = randInt(2, 18), b = randInt(1, 20 - a); answer = a + b; problemText = `${a} + ${b} = ?`; }
+      else { const a = randInt(5, 20), b = randInt(1, a); answer = a - b; problemText = `${a} − ${b} = ?`; }
+    } else if (d === 'hard') {
+      const op = choice(['+', '-', '×', '×']);
+      if (op === '+') { const a = randInt(15, 80), b = randInt(10, 100 - a); answer = a + b; problemText = `${a} + ${b} = ?`; }
+      else if (op === '-') { const a = randInt(20, 99), b = randInt(5, a - 1); answer = a - b; problemText = `${a} − ${b} = ?`; }
+      else { const a = randInt(2, 10), b = randInt(2, 10); answer = a * b; problemText = `${a} × ${b} = ?`; }
     } else {
-      op = choice(['+', '-', '×', '×']);
-      if (op === '+') { a = randInt(15, 80); b = randInt(10, 100 - a); answer = a + b; }
-      else if (op === '-') { a = randInt(20, 99); b = randInt(5, a - 1); answer = a - b; }
-      else { a = randInt(2, 10); b = randInt(2, 10); answer = a * b; }
+      // genius — Mathcounts countdown / AMC 8-10 style
+      const kind = choice([
+        'square', 'cube', 'sqrt', 'power2', 'power3',
+        'mult', 'div', 'mult', 'percent', 'percent',
+        'gcf', 'lcm', 'algebra', 'algebra',
+        'factorial', 'choose2', 'sumarith', 'modulo',
+        'mixed', 'mixed', 'fraction',
+      ]);
+      switch (kind) {
+        case 'square': {
+          const n = randInt(11, 25);
+          answer = n * n; problemText = `${n}² = ?`; break;
+        }
+        case 'cube': {
+          const n = randInt(3, 12);
+          answer = n * n * n; problemText = `${n}³ = ?`; break;
+        }
+        case 'sqrt': {
+          const n = randInt(5, 20);
+          answer = n; problemText = `√${n * n} = ?`; break;
+        }
+        case 'power2': {
+          const e = randInt(4, 10);
+          answer = Math.pow(2, e); problemText = `2^${e} = ?`; break;
+        }
+        case 'power3': {
+          const e = randInt(3, 6);
+          answer = Math.pow(3, e); problemText = `3^${e} = ?`; break;
+        }
+        case 'mult': {
+          const a = randInt(11, 19), b = randInt(6, 19);
+          answer = a * b; problemText = `${a} × ${b} = ?`; break;
+        }
+        case 'div': {
+          const b = randInt(4, 15), q = randInt(6, 25);
+          answer = q; problemText = `${b * q} ÷ ${b} = ?`; break;
+        }
+        case 'percent': {
+          const pcts = [10, 15, 20, 25, 30, 40, 50, 60, 75];
+          const p = choice(pcts);
+          // pick base so answer is whole
+          let base;
+          do { base = randInt(2, 20) * 10; } while ((p * base) % 100 !== 0);
+          answer = (p * base) / 100;
+          problemText = `${p}% of ${base} = ?`; break;
+        }
+        case 'gcf': {
+          const x = randInt(2, 12), y = randInt(2, 12);
+          const g = randInt(2, 9);
+          answer = g * gcd(x, y);
+          problemText = `GCF(${g * x}, ${g * y}) = ?`; break;
+        }
+        case 'lcm': {
+          const a = randInt(3, 10), b = randInt(3, 12);
+          answer = lcm(a, b);
+          problemText = `LCM(${a}, ${b}) = ?`; break;
+        }
+        case 'algebra': {
+          // ax + b = c, solve for x
+          const a = randInt(2, 9), x = randInt(2, 12), b = randInt(1, 20);
+          const c = a * x + b;
+          answer = x;
+          problemText = `${a}x + ${b} = ${c}, x = ?`; break;
+        }
+        case 'factorial': {
+          const n = randInt(4, 7);
+          let f = 1;
+          for (let i = 2; i <= n; i++) f *= i;
+          answer = f; problemText = `${n}! = ?`; break;
+        }
+        case 'choose2': {
+          const n = randInt(4, 12);
+          answer = n * (n - 1) / 2;
+          problemText = `C(${n}, 2) = ?`; break;
+        }
+        case 'sumarith': {
+          // sum of first n positive integers
+          const n = randInt(8, 25);
+          answer = n * (n + 1) / 2;
+          problemText = `1+2+…+${n} = ?`; break;
+        }
+        case 'modulo': {
+          const m = randInt(3, 9);
+          const q = randInt(3, 12);
+          const r = randInt(0, m - 1);
+          answer = r;
+          problemText = `${m * q + r} mod ${m} = ?`; break;
+        }
+        case 'fraction': {
+          // a/b + c/d with common-friendly denominators
+          const denomPair = choice([[2,4],[3,6],[2,6],[3,4],[4,8],[2,3],[3,9],[5,10]]);
+          const [d1, d2] = denomPair;
+          const num1 = randInt(1, d1 - 1), num2 = randInt(1, d2 - 1);
+          const L = lcm(d1, d2);
+          const sumNum = num1 * (L / d1) + num2 * (L / d2);
+          // produce "a/b + c/d × L = ?" — answer is numerator over L when over common denom
+          // simpler: ask sum × L
+          answer = sumNum;
+          problemText = `(${num1}/${d1} + ${num2}/${d2}) × ${L} = ?`; break;
+        }
+        case 'mixed': {
+          // order of ops: a × b + c, or a + b × c
+          const a = randInt(2, 12), b = randInt(2, 12), c = randInt(2, 20);
+          if (Math.random() < 0.5) { answer = a * b + c; problemText = `${a} × ${b} + ${c} = ?`; }
+          else { answer = c + a * b; problemText = `${c} + ${a} × ${b} = ?`; }
+          break;
+        }
+      }
     }
 
     let wrong;
     let attempts = 0;
     do {
-      const delta = choice([-3, -2, -1, 1, 2, 3, -10, 10]);
+      // pick a wrong answer that's "near" the right one but believable
+      const range = Math.max(2, Math.floor(Math.abs(answer) * 0.15));
+      const delta = randInt(-range - 2, range + 2) || 1;
       wrong = answer + delta;
-      if (wrong < 0) wrong = answer + Math.abs(delta);
+      if (wrong < 0) wrong = answer + Math.abs(delta) + 1;
       attempts++;
-    } while (wrong === answer && attempts < 10);
+    } while (wrong === answer && attempts < 12);
     if (wrong === answer) wrong = answer + 1;
 
-    return { problemText: `${a} ${op} ${b} = ?`, answer, wrong };
+    return { problemText, answer, wrong };
   }
 
   // ===== Canvas sizing =====
@@ -216,13 +333,20 @@
   function spawnDragon(forceSize = null) {
     if (CHARACTERS.length === 0) return;
     const character = choice(CHARACTERS_WITH_IMG.length > 0 ? CHARACTERS_WITH_IMG : CHARACTERS);
-    // 60% smaller-than-player, 40% bigger — gives the player breathing room
     const playerSize = state.player ? state.player.size : PLAYER_START_SIZE;
+    const inGrace = state.graceUntil && performance.now() < state.graceUntil;
     let size;
     if (forceSize) size = forceSize;
-    else if (Math.random() < 0.6) size = playerSize - randInt(8, 22) - Math.random() * 6;
-    else size = playerSize + randInt(10, 30) + Math.random() * 10;
-    size = Math.max(16, Math.min(180, size));
+    else if (inGrace) {
+      // During the grace window: NEVER spawn a dragon bigger than the player
+      size = playerSize - randInt(6, 18) - Math.random() * 6;
+    } else if (Math.random() < 0.6) {
+      // After grace: 60% smaller / 40% bigger
+      size = playerSize - randInt(8, 22) - Math.random() * 6;
+    } else {
+      size = playerSize + randInt(10, 30) + Math.random() * 10;
+    }
+    size = Math.max(14, Math.min(180, size));
     const p = randomEmptyPosition(size);
     const ang = Math.random() * Math.PI * 2;
     const speed = ENEMY_BASE_SPEED * (0.7 + Math.random() * 0.7);
@@ -269,8 +393,11 @@
       spawnedAt: performance.now(),
     };
     state.others.push(correct, wrong);
-    state.activeMath = { problemText: mp.problemText, answer: mp.answer, eggs: [correct, wrong] };
+    state.activeMath = { problemText: mp.problemText, answer: mp.answer, eggs: [correct, wrong], lastTimerShown: null };
     mathProblem.textContent = mp.problemText;
+    const timeoutMs = state.difficulty === 'genius' ? MATH_ANSWER_TIMEOUT_GENIUS_MS : MATH_ANSWER_TIMEOUT_MS;
+    $('math-timer').textContent = Math.ceil(timeoutMs / 1000) + 's';
+    $('math-timer').classList.toggle('countdown', state.difficulty === 'genius');
     mathBanner.classList.remove('hidden');
   }
 
@@ -320,15 +447,16 @@
       hurtFlash: 0,
     };
 
-    for (let i = 0; i < 10; i++) spawnEgg();
-    // Friendly start: 4 smaller dragons + 1 bigger one (far away thanks to randomEmptyPosition spacing)
-    for (let i = 0; i < 4; i++) {
-      const size = PLAYER_START_SIZE - 8 - Math.random() * 6;
-      spawnDragon(Math.max(16, size));
+    for (let i = 0; i < 12; i++) spawnEgg();
+    // Grace start: spawn ONLY smaller dragons. Big dragons start spawning after the grace window.
+    for (let i = 0; i < 5; i++) {
+      const size = PLAYER_START_SIZE - 8 - Math.random() * 8;
+      spawnDragon(Math.max(14, size));
     }
-    spawnDragon(PLAYER_START_SIZE + 18 + Math.random() * 14);
 
     const now = performance.now();
+    state.startTime = now;
+    state.graceUntil = now + GRACE_PERIOD_MS;
     state.nextMathAt = now + MATH_FIRST_DELAY_MS;
     state.nextPowerupAt = now + POWERUP_INTERVAL_MS;
     state.lastFrame = now;
@@ -399,10 +527,21 @@
     if (t >= state.nextMathAt) { spawnMath(); state.nextMathAt = t + MATH_INTERVAL_MS; }
     if (t >= state.nextPowerupAt) { spawnPowerup(); state.nextPowerupAt = t + POWERUP_INTERVAL_MS; }
 
-    // Math timeout
+    // Math timeout — faster for Genius (Mathcounts countdown pace)
     if (state.activeMath) {
       const e0 = state.activeMath.eggs[0];
-      if (e0 && t - e0.spawnedAt > MATH_ANSWER_TIMEOUT_MS) clearActiveMath();
+      const timeoutMs = state.difficulty === 'genius' ? MATH_ANSWER_TIMEOUT_GENIUS_MS : MATH_ANSWER_TIMEOUT_MS;
+      if (e0) {
+        const age = t - e0.spawnedAt;
+        if (age > timeoutMs) clearActiveMath();
+        else {
+          const remain = Math.max(0, Math.ceil((timeoutMs - age) / 1000));
+          if (state.activeMath.lastTimerShown !== remain) {
+            state.activeMath.lastTimerShown = remain;
+            $('math-timer').textContent = remain + 's';
+          }
+        }
+      }
     }
 
     // Power-up countdown

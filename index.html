@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
   <meta name="googlebot" content="noindex, nofollow">
   <title>Iris Juliet's Dragon Math Quest</title>
-  <link rel="stylesheet" href="styles.css?v=2">
+  <link rel="stylesheet" href="styles.css?v=3">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🐉%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -44,6 +44,11 @@
             <span class="diff-emoji">🔥</span>
             <span class="diff-name">Hard</span>
             <span class="diff-desc">100 + ×</span>
+          </button>
+          <button class="diff-btn" data-diff="genius" role="radio" aria-checked="false">
+            <span class="diff-emoji">🧠</span>
+            <span class="diff-name">Genius</span>
+            <span class="diff-desc">Mathcounts<br>countdown</span>
           </button>
         </div>
       </div>
@@ -97,7 +102,10 @@
     </div>
 
     <div id="math-banner" class="math-banner hidden">
-      <span class="math-label">Solve to level up</span>
+      <div class="math-banner-row">
+        <span class="math-label">Solve to level up</span>
+        <span id="math-timer" class="math-timer">22s</span>
+      </div>
       <span id="math-problem" class="math-problem">7 + 8 = ?</span>
     </div>
 
@@ -166,6 +174,6 @@
     </p>
   </footer>
 
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>
