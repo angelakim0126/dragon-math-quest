@@ -13,7 +13,7 @@
 
   // ===== Sizes =====
   const PLAYER_START_SIZE = 28;
-  const PLAYER_MAX_SIZE = 220;
+  const PLAYER_MAX_SIZE = 140;   // was 220 — keeps the canvas uncluttered
   const EGG_SIZE = 18;
   const MATH_EGG_SIZE = 26;
   const POWERUP_SIZE = 26;
@@ -654,17 +654,23 @@
 
   function getLevel() { return LEVELS[state.levelId] || LEVELS[0]; }
 
-  // Map a dragon's pixel size to a discrete level 1-8 so players see concrete
-  // progression instead of just bigger/smaller blobs.
+  // Enemy level from size — finer granularity so growth feels gradual.
+  // ~5 size units per level. Caps at ~30.
   function dragonLevel(size) {
-    if (size < 22) return 1;
-    if (size < 32) return 2;
-    if (size < 46) return 3;
-    if (size < 64) return 4;
-    if (size < 86) return 5;
-    if (size < 112) return 6;
-    if (size < 144) return 7;
-    return 8;
+    return Math.max(1, Math.min(30, Math.floor(size / 5) - 1));
+  }
+
+  // Player level from XP. XP accrues from eggs, eating dragons, math, etc.
+  // threshold(L) = 5 * L * (L - 1)  →  invert to solve for L given xp.
+  // So progression is not solely about size; combat & math both count.
+  function playerLevel(xp) {
+    if (!xp || xp < 0) return 1;
+    return Math.max(1, Math.floor((5 + Math.sqrt(25 + 20 * xp)) / 10));
+  }
+  function xpForLevel(L) { return 5 * L * (L - 1); }
+  function xpToNextLevel(xp) {
+    const L = playerLevel(xp);
+    return xpForLevel(L + 1) - xp;
   }
 
   function spawnDragon(forceSize = null) {
@@ -719,7 +725,8 @@
   }
 
   function spawnPowerup() {
-    const kinds = ['levelup']; // bombs & fire removed — only level-up remains
+    // Bombs removed. Power (🔥) and Level-Up (⭐) remain.
+    const kinds = ['power', 'levelup', 'levelup'];
     const kind = choice(kinds);
     const p = randomEmptyPosition(POWERUP_SIZE);
     state.others.push({
@@ -809,6 +816,7 @@
     state.screenShake = 0;
     state.timesTable = 2;
     state.timesB = 1;
+    state.xp = 0;
     $('math-banner').classList.remove('active');
     $('math-problem').textContent = 'Math problem coming soon';
     $('math-timer').textContent = '';
@@ -859,7 +867,9 @@
 
   function updateHud() {
     hudScore.textContent = state.score;
-    hudSize.textContent = state.player ? dragonLevel(state.player.size) : 1;
+    // Dragon Lv is XP-based for the player — reflects eggs + dragons eaten +
+    // math correct, not just current size. Granular progression.
+    hudSize.textContent = playerLevel(state.xp || 0);
     hudLevel.textContent = state.level;
   }
 
@@ -1199,13 +1209,15 @@
 
   function eatEgg(o) {
     state.score += 5;
-    growPlayer(2);
+    state.xp += 5;
+    growPlayer(1.0);   // was 2 — slower growth keeps the play field uncluttered
     burst(o.x, o.y, '#ffe892', 14);
   }
 
   function eatDragon(o) {
     state.score += Math.floor(20 + o.size);
-    growPlayer(Math.max(4, o.size * 0.18));
+    state.xp += 20 + Math.floor(o.size * 0.6);
+    growPlayer(Math.max(2, o.size * 0.10));   // was 0.18
     const tribeColor = o.character && TRIBES[o.character.tribe] ? TRIBES[o.character.tribe].main : '#ff6b35';
     burst(o.x, o.y, tribeColor, 30);
     burst(o.x, o.y, '#fff4d1', 12);
@@ -1214,7 +1226,8 @@
   function onMathRight(o) {
     state.score += 60;
     state.level += 1;
-    growPlayer(12);
+    state.xp += 50;       // math is the biggest XP source — rewards solving
+    growPlayer(6);        // was 12
     burst(o.x, o.y, '#ffd54a', 35);
     burst(o.x, o.y, '#b266ff', 22);
     flashMathBanner(true);
@@ -1278,7 +1291,8 @@
     if (kind === 'levelup') {
       state.score += 30;
       state.level += 1;
-      growPlayer(15);
+      state.xp += 30;
+      growPlayer(7);   // was 15
       return;
     }
     state.powerup = { kind, endsAt: performance.now() + POWERUP_DURATION_MS };
@@ -1378,7 +1392,7 @@
 
     $('gameover-msg').textContent = reason;
     $('final-score').textContent = state.score;
-    $('final-length').textContent = dragonLevel(state.player.size);
+    $('final-length').textContent = playerLevel(state.xp || 0);
     $('final-level').textContent = state.level;
 
     const qualifies = qualifiesForLeaderboard(state.score);
@@ -2111,10 +2125,11 @@
         ctx.restore();
       }
 
-      // "YOU · Lv X" indicator floating above the player
+      // "YOU · Lv X" indicator floating above the player.
+      // Uses XP-based level so progression reflects eating + math, not just size.
       const arrowY = o.y - o.size - 22 - Math.sin(t / 350) * 4;
       const arrowX = o.x;
-      const lvl = dragonLevel(o.size);
+      const lvl = playerLevel(state.xp || 0);
       const youText = `YOU · Lv ${lvl}`;
       ctx.save();
       ctx.font = `bold 15px Georgia, serif`;
