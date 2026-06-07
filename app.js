@@ -47,11 +47,56 @@
   const LB_KEY = 'dmq_leaderboard_v1';
   const LB_NAME_KEY = 'dmq_player_name';
   const LB_SIZE = 10;
+  const UNLOCK_KEY = 'dmq_unlocked_level_v1';
+
+  // ===== Levels (each has its own map + difficulty tuning) =====
+  // unlockScore: score needed on the previous level to unlock this one
+  // params per level adjust the gameplay difficulty
+  const LEVELS = [
+    {
+      id: 0, name: 'Sky Kingdom', map: 'sky',
+      emoji: '✨', unlockScore: 0,
+      bombsMax: 1, bigChance: 0.45, giantChance: 0.08, speedMult: 1.0,
+      description: 'A starlit night sky',
+    },
+    {
+      id: 1, name: 'Rainforest', map: 'forest',
+      emoji: '🌳', unlockScore: 50,
+      bombsMax: 1, bigChance: 0.50, giantChance: 0.10, speedMult: 1.05,
+      description: 'Mossy trees and falling leaves',
+    },
+    {
+      id: 2, name: 'Sunny Park', map: 'park',
+      emoji: '🌼', unlockScore: 120,
+      bombsMax: 2, bigChance: 0.55, giantChance: 0.12, speedMult: 1.1,
+      description: 'Grass, daisies, and butterflies',
+    },
+    {
+      id: 3, name: 'Deep Space', map: 'space',
+      emoji: '🪐', unlockScore: 250,
+      bombsMax: 2, bigChance: 0.60, giantChance: 0.14, speedMult: 1.15,
+      description: 'Stars, nebulae, and floating planets',
+    },
+    {
+      id: 4, name: 'Sky Fire', map: 'volcano',
+      emoji: '🔥', unlockScore: 450,
+      bombsMax: 3, bigChance: 0.65, giantChance: 0.16, speedMult: 1.22,
+      description: 'Glowing embers and lava streams',
+    },
+    {
+      id: 5, name: 'Ice Kingdom', map: 'arctic',
+      emoji: '❄️', unlockScore: 700,
+      bombsMax: 3, bigChance: 0.70, giantChance: 0.18, speedMult: 1.3,
+      description: 'Snowfall and crystal frost',
+    },
+  ];
 
   // ===== State =====
   const state = {
     difficulty: 'hard',
     chosenCharIndex: 0, // index into the PLAYER_CHARS roster
+    levelId: 0,         // which LEVELS entry is being played
+    unlockedLevel: 0,   // highest unlocked level id (loaded from localStorage at init)
     running: false,
     paused: false,
     score: 0,
@@ -336,21 +381,24 @@
     });
   }
 
+  function getLevel() { return LEVELS[state.levelId] || LEVELS[0]; }
+
   function spawnDragon(forceSize = null) {
     if (CHARACTERS.length === 0) return;
     const character = choice(CHARACTERS_WITH_IMG.length > 0 ? CHARACTERS_WITH_IMG : CHARACTERS);
     const playerSize = state.player ? state.player.size : PLAYER_START_SIZE;
     const inGrace = state.graceUntil && performance.now() < state.graceUntil;
     let size;
+    const lvl = LEVELS[state.levelId] || LEVELS[0];
     if (forceSize) size = forceSize;
     else if (inGrace) {
       // During the grace window: NEVER spawn a dragon bigger than the player
       size = playerSize - randInt(6, 18) - Math.random() * 6;
-    } else if (Math.random() < GIANT_CHANCE) {
+    } else if (Math.random() < lvl.giantChance) {
       // Rare: spawn a GIANT dragon — much bigger than the player, very scary
       size = GIANT_SIZE_MIN + Math.random() * (GIANT_SIZE_MAX - GIANT_SIZE_MIN);
-    } else if (Math.random() < 0.45) {
-      // 45% smaller, 55% bigger overall after grace — actually challenging
+    } else if (Math.random() >= lvl.bigChance) {
+      // smaller-than-player path
       size = playerSize - randInt(8, 22) - Math.random() * 6;
     } else {
       size = playerSize + randInt(12, 34) + Math.random() * 10;
@@ -358,7 +406,7 @@
     size = Math.max(14, Math.min(GIANT_SIZE_MAX, size));
     const p = randomEmptyPosition(size);
     const ang = Math.random() * Math.PI * 2;
-    const speed = ENEMY_BASE_SPEED * (0.7 + Math.random() * 0.7);
+    const speed = ENEMY_BASE_SPEED * (0.7 + Math.random() * 0.7) * lvl.speedMult;
     state.others.push({
       type: 'dragon',
       x: p.x, y: p.y,
@@ -559,11 +607,12 @@
     if (t >= state.nextMathAt) { spawnMath(); state.nextMathAt = t + MATH_INTERVAL_MS; }
     if (t >= state.nextPowerupAt) { spawnPowerup(); state.nextPowerupAt = t + POWERUP_INTERVAL_MS; }
 
-    // Bombs — only after grace, capped at MAX_BOMBS
+    // Bombs — only after grace, capped per level
     if (t > state.graceUntil) {
       if (!state.nextBombAt) state.nextBombAt = t + 6000;
+      const lvl = LEVELS[state.levelId] || LEVELS[0];
       const bombCount = state.others.filter(o => o.type === 'bomb').length;
-      if (t >= state.nextBombAt && bombCount < MAX_BOMBS) {
+      if (t >= state.nextBombAt && bombCount < lvl.bombsMax) {
         spawnBomb();
         state.nextBombAt = t + BOMB_INTERVAL_MS;
       }
@@ -688,20 +737,18 @@
 
     if (d.turnCooldown <= 0) {
       d.turnCooldown = 700 + Math.random() * 800;
-      // Bigger dragons only notice and chase when close — gives Iris breathing room
+      const speedMult = getLevel().speedMult;
       if (biggerThanPlayer && !powered && dToPlayer < 220) {
-        const sp = ENEMY_BASE_SPEED * 0.75;
+        const sp = ENEMY_BASE_SPEED * 0.75 * speedMult;
         d.vx = (dx / dToPlayer) * sp;
         d.vy = (dy / dToPlayer) * sp;
       } else if ((smallerThanPlayer || powered) && dToPlayer < 280) {
-        // Smaller dragons flee
-        const sp = ENEMY_BASE_SPEED * 1.05;
+        const sp = ENEMY_BASE_SPEED * 1.05 * speedMult;
         d.vx = -(dx / dToPlayer) * sp;
         d.vy = -(dy / dToPlayer) * sp;
       } else {
-        // wander
         const ang = Math.random() * Math.PI * 2;
-        const sp = ENEMY_BASE_SPEED * (0.6 + Math.random() * 0.6);
+        const sp = ENEMY_BASE_SPEED * (0.6 + Math.random() * 0.6) * speedMult;
         d.vx = Math.cos(ang) * sp;
         d.vy = Math.sin(ang) * sp;
       }
@@ -932,6 +979,24 @@
     state.running = false;
     cancelAnimationFrame(state.rafId);
 
+    // Check if a new level unlocks
+    const nextLevel = LEVELS[state.levelId + 1];
+    let unlockedNow = null;
+    if (nextLevel && state.unlockedLevel < nextLevel.id && state.score >= nextLevel.unlockScore) {
+      state.unlockedLevel = nextLevel.id;
+      saveUnlockedLevel();
+      unlockedNow = nextLevel;
+    }
+    const unlockBanner = $('level-unlock-banner');
+    if (unlockBanner) {
+      if (unlockedNow) {
+        unlockBanner.innerHTML = `🎉 <strong>New level unlocked:</strong> ${unlockedNow.emoji} ${escapeHtml(unlockedNow.name)}!`;
+        unlockBanner.classList.remove('hidden');
+      } else {
+        unlockBanner.classList.add('hidden');
+      }
+    }
+
     $('gameover-msg').textContent = reason;
     $('final-score').textContent = state.score;
     $('final-length').textContent = Math.round(state.player.size);
@@ -1092,11 +1157,35 @@
   }
 
   function drawBackground() {
-    // Stars / sparkles
+    const lvl = getLevel();
+    switch (lvl.map) {
+      case 'forest':  drawMapForest();  break;
+      case 'park':    drawMapPark();    break;
+      case 'space':   drawMapSpace();   break;
+      case 'volcano': drawMapVolcano(); break;
+      case 'arctic':  drawMapArctic();  break;
+      case 'sky':
+      default:        drawMapSky();     break;
+    }
+  }
+
+  function drawMapBaseGradient(stops) {
+    const g = ctx.createLinearGradient(0, 0, 0, PLAY_H);
+    for (const [pos, color] of stops) g.addColorStop(pos, color);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, PLAY_W, PLAY_H);
+  }
+
+  function drawMapSky() {
+    drawMapBaseGradient([
+      [0,    '#1a0830'],
+      [0.5,  '#2d1654'],
+      [1,    '#4a1e6e'],
+    ]);
     const t = performance.now() / 1000;
     for (let i = 0; i < 40; i++) {
-      const x = ((i * 137.5) % PLAY_W);
-      const y = ((i * 97.3) % PLAY_H);
+      const x = (i * 137.5) % PLAY_W;
+      const y = (i * 97.3) % PLAY_H;
       const tw = 0.4 + 0.6 * Math.abs(Math.sin(t + i * 0.7));
       ctx.globalAlpha = 0.4 * tw;
       ctx.fillStyle = '#fff4d1';
@@ -1105,6 +1194,311 @@
       ctx.fill();
     }
     ctx.globalAlpha = 1;
+  }
+
+  function drawMapForest() {
+    drawMapBaseGradient([
+      [0,   '#0d2818'],
+      [0.5, '#1a4d2e'],
+      [1,   '#0f3a22'],
+    ]);
+    const t = performance.now() / 1000;
+    // Soft sun rays from top
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const ray = ctx.createRadialGradient(PLAY_W * 0.7, 0, 0, PLAY_W * 0.7, 0, PLAY_W * 0.5);
+    ray.addColorStop(0, 'rgba(200, 240, 130, 0.25)');
+    ray.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = ray;
+    ctx.fillRect(0, 0, PLAY_W, PLAY_H);
+    ctx.restore();
+
+    // Tree silhouettes at the bottom
+    const trees = 7;
+    for (let i = 0; i < trees; i++) {
+      const tx = (i + 0.5) * (PLAY_W / trees) + Math.sin(i) * 30;
+      const sway = Math.sin(t * 0.4 + i) * 4;
+      const treeHeight = 230 + (i % 3) * 30;
+      const baseY = PLAY_H;
+      // Trunk
+      ctx.fillStyle = '#3a2014';
+      ctx.fillRect(tx - 12, baseY - treeHeight * 0.45, 24, treeHeight * 0.45);
+      // Foliage circles
+      ctx.fillStyle = `rgba(34, ${100 + (i % 4) * 12}, 50, 0.95)`;
+      for (let k = 0; k < 4; k++) {
+        ctx.beginPath();
+        ctx.arc(
+          tx + sway + (k - 1.5) * 24,
+          baseY - treeHeight + 30 + (k % 2) * 30,
+          50 + (k % 2) * 8,
+          0, Math.PI * 2,
+        );
+        ctx.fill();
+      }
+    }
+
+    // Floating leaves
+    for (let i = 0; i < 14; i++) {
+      const baseX = (i * 137.5) % PLAY_W;
+      const baseY = (i * 97.3) % PLAY_H;
+      const driftX = Math.sin(t * 0.5 + i) * 60;
+      const fallY = ((t * 20 + i * 50) % (PLAY_H + 100)) - 50;
+      const x = (baseX + driftX + PLAY_W) % PLAY_W;
+      const y = (baseY + fallY) % PLAY_H;
+      const rot = t * (1 + i * 0.1) + i;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rot);
+      ctx.fillStyle = i % 3 === 0 ? '#d4a017' : i % 3 === 1 ? '#c2410c' : '#4ade80';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 6, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawMapPark() {
+    drawMapBaseGradient([
+      [0,   '#5ec3ff'],
+      [0.55, '#a8dfff'],
+      [0.6,  '#4ade80'],
+      [1,    '#2e8b57'],
+    ]);
+    const t = performance.now() / 1000;
+    // Sun
+    const sunX = PLAY_W * 0.85;
+    const sunY = PLAY_H * 0.15;
+    const sunGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 120);
+    sunGlow.addColorStop(0, 'rgba(255, 255, 220, 0.9)');
+    sunGlow.addColorStop(0.5, 'rgba(255, 213, 74, 0.5)');
+    sunGlow.addColorStop(1, 'rgba(255, 213, 74, 0)');
+    ctx.fillStyle = sunGlow;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, 120, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff4d1';
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, 40, 0, Math.PI * 2);
+    ctx.fill();
+    // Clouds
+    for (let i = 0; i < 4; i++) {
+      const cy = PLAY_H * 0.12 + i * 30;
+      const cx = ((t * 18 + i * 350) % (PLAY_W + 200)) - 100;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      for (let k = 0; k < 4; k++) {
+        ctx.beginPath();
+        ctx.arc(cx + k * 28, cy + (k % 2) * 8, 24, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // Grass blades and daisies
+    for (let i = 0; i < 18; i++) {
+      const x = (i * 73 + 30) % PLAY_W;
+      const y = PLAY_H * 0.65 + (i % 5) * 20;
+      // daisy
+      if (i % 3 === 0) {
+        ctx.fillStyle = '#fff';
+        for (let p = 0; p < 6; p++) {
+          const ang = (p / 6) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.ellipse(x + Math.cos(ang) * 7, y + Math.sin(ang) * 7, 4, 6, ang, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#ffd54a';
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = '#228B22';
+        ctx.fillRect(x - 1, y - 6, 2, 12);
+      }
+    }
+    // Butterflies
+    for (let i = 0; i < 3; i++) {
+      const bx = (PLAY_W * (0.2 + i * 0.3)) + Math.sin(t + i) * 80;
+      const by = PLAY_H * 0.4 + Math.cos(t * 1.3 + i) * 50;
+      const flap = Math.sin(t * 14 + i) * 0.4;
+      ctx.fillStyle = i === 0 ? '#ff4f8b' : i === 1 ? '#b266ff' : '#ffd54a';
+      ctx.save();
+      ctx.translate(bx, by);
+      ctx.scale(1, 0.6 + flap);
+      ctx.beginPath();
+      ctx.arc(-6, 0, 7, 0, Math.PI * 2);
+      ctx.arc(6, 0, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawMapSpace() {
+    drawMapBaseGradient([
+      [0,    '#000010'],
+      [0.5,  '#0a0420'],
+      [1,    '#1a0830'],
+    ]);
+    const t = performance.now() / 1000;
+    // Nebula clouds
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const nebulas = [
+      { x: 0.2, y: 0.3, c: 'rgba(178, 102, 255, 0.4)', r: 280 },
+      { x: 0.75, y: 0.6, c: 'rgba(255, 79, 139, 0.35)', r: 240 },
+      { x: 0.5, y: 0.15, c: 'rgba(94, 195, 255, 0.3)', r: 220 },
+    ];
+    for (const n of nebulas) {
+      const g = ctx.createRadialGradient(PLAY_W * n.x, PLAY_H * n.y, 0, PLAY_W * n.x, PLAY_H * n.y, n.r);
+      g.addColorStop(0, n.c);
+      g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(PLAY_W * n.x, PLAY_H * n.y, n.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    // LOTS of twinkling stars
+    for (let i = 0; i < 120; i++) {
+      const x = (i * 137.5) % PLAY_W;
+      const y = (i * 97.3) % PLAY_H;
+      const tw = 0.3 + 0.7 * Math.abs(Math.sin(t * 2 + i * 0.7));
+      ctx.globalAlpha = tw;
+      ctx.fillStyle = i % 7 === 0 ? '#5ec3ff' : i % 5 === 0 ? '#ff4f8b' : '#fff4d1';
+      ctx.beginPath();
+      ctx.arc(x, y, 1 + (i % 4 === 0 ? 1.5 : 0), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // Planet
+    const px = PLAY_W * 0.88;
+    const py = PLAY_H * 0.85;
+    const pGrad = ctx.createRadialGradient(px - 30, py - 30, 0, px, py, 80);
+    pGrad.addColorStop(0, '#ff9d4a');
+    pGrad.addColorStop(0.6, '#c2410c');
+    pGrad.addColorStop(1, '#2d1654');
+    ctx.fillStyle = pGrad;
+    ctx.beginPath();
+    ctx.arc(px, py, 80, 0, Math.PI * 2);
+    ctx.fill();
+    // Ring
+    ctx.strokeStyle = 'rgba(255, 213, 74, 0.6)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.ellipse(px, py, 120, 30, 0.5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  function drawMapVolcano() {
+    drawMapBaseGradient([
+      [0,    '#3a0612'],
+      [0.5,  '#8b1a0e'],
+      [1,    '#1a0408'],
+    ]);
+    const t = performance.now() / 1000;
+    // Lava glow at bottom
+    const lava = ctx.createRadialGradient(PLAY_W / 2, PLAY_H * 1.1, 0, PLAY_W / 2, PLAY_H * 1.1, PLAY_W * 0.7);
+    lava.addColorStop(0, 'rgba(255, 213, 74, 0.5)');
+    lava.addColorStop(0.4, 'rgba(255, 107, 53, 0.35)');
+    lava.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = lava;
+    ctx.fillRect(0, 0, PLAY_W, PLAY_H);
+    // Volcano silhouettes
+    ctx.fillStyle = '#1a0408';
+    ctx.beginPath();
+    ctx.moveTo(0, PLAY_H);
+    ctx.lineTo(PLAY_W * 0.15, PLAY_H * 0.7);
+    ctx.lineTo(PLAY_W * 0.25, PLAY_H * 0.78);
+    ctx.lineTo(PLAY_W * 0.4, PLAY_H * 0.55);
+    ctx.lineTo(PLAY_W * 0.55, PLAY_H * 0.75);
+    ctx.lineTo(PLAY_W * 0.7, PLAY_H * 0.6);
+    ctx.lineTo(PLAY_W * 0.85, PLAY_H * 0.72);
+    ctx.lineTo(PLAY_W, PLAY_H * 0.65);
+    ctx.lineTo(PLAY_W, PLAY_H);
+    ctx.closePath();
+    ctx.fill();
+    // Lava streaks on the volcanoes
+    ctx.strokeStyle = '#ff6b35';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(PLAY_W * 0.4, PLAY_H * 0.55);
+    ctx.lineTo(PLAY_W * 0.42, PLAY_H * 0.85);
+    ctx.moveTo(PLAY_W * 0.7, PLAY_H * 0.6);
+    ctx.lineTo(PLAY_W * 0.68, PLAY_H * 0.9);
+    ctx.stroke();
+    // Floating embers
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 30; i++) {
+      const baseX = (i * 137.5) % PLAY_W;
+      const driftX = Math.sin(t * 0.6 + i) * 30;
+      const fallY = PLAY_H - ((t * 50 + i * 60) % (PLAY_H + 100));
+      const x = (baseX + driftX + PLAY_W) % PLAY_W;
+      const y = fallY;
+      const a = 0.7 - (PLAY_H - y) / PLAY_H * 0.7;
+      ctx.globalAlpha = Math.max(0, a);
+      ctx.fillStyle = i % 3 === 0 ? '#ffd54a' : '#ff6b35';
+      ctx.beginPath();
+      ctx.arc(x, y, 2 + (i % 3), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawMapArctic() {
+    drawMapBaseGradient([
+      [0,    '#1e3a5f'],
+      [0.5,  '#5b8fb9'],
+      [1,    '#a8d8ff'],
+    ]);
+    const t = performance.now() / 1000;
+    // Aurora ribbons
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 3; i++) {
+      const grad = ctx.createLinearGradient(0, PLAY_H * 0.1 + i * 40, 0, PLAY_H * 0.5 + i * 40);
+      const cols = [
+        ['rgba(94, 195, 255, 0.35)', 'rgba(94, 195, 255, 0)'],
+        ['rgba(74, 222, 128, 0.3)',  'rgba(74, 222, 128, 0)'],
+        ['rgba(178, 102, 255, 0.3)', 'rgba(178, 102, 255, 0)'],
+      ][i];
+      grad.addColorStop(0, cols[0]);
+      grad.addColorStop(1, cols[1]);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(0, PLAY_H * 0.15 + i * 30 + Math.sin(t + i) * 20);
+      for (let x = 0; x <= PLAY_W; x += 40) {
+        ctx.lineTo(x, PLAY_H * 0.15 + i * 30 + Math.sin(t + i + x * 0.005) * 30);
+      }
+      ctx.lineTo(PLAY_W, PLAY_H * 0.6);
+      ctx.lineTo(0, PLAY_H * 0.6);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+    // Ice mountains
+    ctx.fillStyle = '#e8f4ff';
+    ctx.beginPath();
+    ctx.moveTo(0, PLAY_H);
+    ctx.lineTo(PLAY_W * 0.2, PLAY_H * 0.72);
+    ctx.lineTo(PLAY_W * 0.35, PLAY_H * 0.82);
+    ctx.lineTo(PLAY_W * 0.5, PLAY_H * 0.68);
+    ctx.lineTo(PLAY_W * 0.7, PLAY_H * 0.78);
+    ctx.lineTo(PLAY_W * 0.85, PLAY_H * 0.65);
+    ctx.lineTo(PLAY_W, PLAY_H * 0.75);
+    ctx.lineTo(PLAY_W, PLAY_H);
+    ctx.closePath();
+    ctx.fill();
+    // Falling snowflakes
+    for (let i = 0; i < 40; i++) {
+      const baseX = (i * 137.5) % PLAY_W;
+      const driftX = Math.sin(t * 0.4 + i) * 40;
+      const fallY = ((t * 30 + i * 50) % (PLAY_H + 100)) - 50;
+      const x = (baseX + driftX + PLAY_W) % PLAY_W;
+      const y = fallY;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.beginPath();
+      ctx.arc(x, y, 1.5 + (i % 3) * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   function drawEntity(o) {
@@ -1497,6 +1891,42 @@
     });
   }
 
+  function loadUnlockedLevel() {
+    const n = Number(localStorage.getItem(UNLOCK_KEY));
+    if (!Number.isFinite(n) || n < 0) state.unlockedLevel = 0;
+    else state.unlockedLevel = Math.min(LEVELS.length - 1, Math.floor(n));
+  }
+
+  function saveUnlockedLevel() {
+    localStorage.setItem(UNLOCK_KEY, String(state.unlockedLevel));
+  }
+
+  function pickLevel(id) {
+    if (id > state.unlockedLevel) return; // locked
+    state.levelId = id;
+    renderLevelPicker();
+  }
+
+  function renderLevelPicker() {
+    const container = $('level-picker');
+    if (!container) return;
+    container.innerHTML = LEVELS.map((lvl) => {
+      const locked = lvl.id > state.unlockedLevel;
+      const selected = lvl.id === state.levelId && !locked;
+      return `<button class="level-card${selected ? ' selected' : ''}${locked ? ' locked' : ''}" data-id="${lvl.id}" role="radio" aria-checked="${selected}" ${locked ? 'aria-disabled="true"' : ''}>
+        <span class="level-emoji">${lvl.emoji}</span>
+        <span class="level-name">${lvl.name}</span>
+        <span class="level-desc">${lvl.description}</span>
+        ${locked
+          ? `<span class="level-lock">🔒 ${lvl.unlockScore} pts</span>`
+          : `<span class="level-status">Ready</span>`}
+      </button>`;
+    }).join('');
+    container.querySelectorAll('.level-card').forEach(btn => {
+      btn.addEventListener('click', () => pickLevel(Number(btn.dataset.id)));
+    });
+  }
+
   function renderPlayerPicker() {
     const container = $('player-picker');
     if (!container || PLAYER_CHARS.length === 0) return;
@@ -1584,9 +2014,12 @@
   }
 
   // ===== Init =====
+  loadUnlockedLevel();
+  state.levelId = Math.min(state.levelId, state.unlockedLevel);
   hudBest.textContent = getTopScore();
   pickDifficulty('hard');
   renderStartLeaderboard();
+  renderLevelPicker();
   loadCharacters();
   previewLoop();
 
