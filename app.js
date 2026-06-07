@@ -654,6 +654,19 @@
 
   function getLevel() { return LEVELS[state.levelId] || LEVELS[0]; }
 
+  // Map a dragon's pixel size to a discrete level 1-8 so players see concrete
+  // progression instead of just bigger/smaller blobs.
+  function dragonLevel(size) {
+    if (size < 22) return 1;
+    if (size < 32) return 2;
+    if (size < 46) return 3;
+    if (size < 64) return 4;
+    if (size < 86) return 5;
+    if (size < 112) return 6;
+    if (size < 144) return 7;
+    return 8;
+  }
+
   function spawnDragon(forceSize = null) {
     if (CHARACTERS.length === 0) return;
     const character = choice(CHARACTERS_WITH_IMG.length > 0 ? CHARACTERS_WITH_IMG : CHARACTERS);
@@ -706,7 +719,7 @@
   }
 
   function spawnPowerup() {
-    const kinds = ['power', 'levelup', 'levelup']; // fly removed
+    const kinds = ['levelup']; // bombs & fire removed — only level-up remains
     const kind = choice(kinds);
     const p = randomEmptyPosition(POWERUP_SIZE);
     state.others.push({
@@ -724,25 +737,34 @@
     const now = performance.now();
     const eggs = [];
 
-    // Correct egg
-    const pc = randomEmptyPosition(MATH_EGG_SIZE);
-    eggs.push({
-      type: 'math', value: mp.answer, correct: true,
-      x: pc.x, y: pc.y, vx: 0, vy: 0,
-      size: MATH_EGG_SIZE, seed: Math.random() * 100,
-      spawnedAt: now,
-    });
+    // Spread math eggs at least this far apart so the player can target one
+    // even when they're large. Scales up with player size.
+    const minSpread = Math.max(150, state.player.size * 1.8 + 90);
 
-    // 3 wrong eggs
-    for (const w of mp.wrongs) {
-      const pw = randomEmptyPosition(MATH_EGG_SIZE);
+    function placeMathEgg(value, correct) {
+      let p = null;
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const candidate = randomEmptyPosition(MATH_EGG_SIZE);
+        // Check distance to already-placed math eggs
+        let ok = true;
+        for (const e of eggs) {
+          const dx = candidate.x - e.x, dy = candidate.y - e.y;
+          if (Math.sqrt(dx * dx + dy * dy) < minSpread) { ok = false; break; }
+        }
+        if (ok) { p = candidate; break; }
+      }
+      // Fallback: just use last candidate even if too close
+      if (!p) p = randomEmptyPosition(MATH_EGG_SIZE);
       eggs.push({
-        type: 'math', value: w, correct: false,
-        x: pw.x, y: pw.y, vx: 0, vy: 0,
+        type: 'math', value, correct,
+        x: p.x, y: p.y, vx: 0, vy: 0,
         size: MATH_EGG_SIZE, seed: Math.random() * 100,
         spawnedAt: now,
       });
     }
+
+    placeMathEgg(mp.answer, true);
+    for (const w of mp.wrongs) placeMathEgg(w, false);
 
     state.others.push(...eggs);
     state.activeMath = { problemText: mp.problemText, answer: mp.answer, eggs, lastTimerShown: null };
@@ -837,7 +859,7 @@
 
   function updateHud() {
     hudScore.textContent = state.score;
-    hudSize.textContent = state.player ? Math.round(state.player.size) : 0;
+    hudSize.textContent = state.player ? dragonLevel(state.player.size) : 1;
     hudLevel.textContent = state.level;
   }
 
@@ -872,8 +894,6 @@
       if (o.type === 'dragon') {
         updateDragonAI(o, dt);
         emitDragonTrail(o, /*isPlayer*/ false);
-      } else if (o.type === 'bomb') {
-        updateBombAI(o, dt, t);
       } else if (o.type === 'egg' || o.type === 'math' || o.type === 'powerup') {
         if (o.seed !== undefined) {
           o.y += Math.sin(t / 700 + o.seed) * 0.15;
@@ -896,16 +916,7 @@
     if (t >= state.nextMathAt) { spawnMath(); state.nextMathAt = t + MATH_INTERVAL_MS; }
     if (t >= state.nextPowerupAt) { spawnPowerup(); state.nextPowerupAt = t + POWERUP_INTERVAL_MS; }
 
-    // Bombs — only after grace, capped per level
-    if (t > state.graceUntil) {
-      if (!state.nextBombAt) state.nextBombAt = t + 6000;
-      const lvl = LEVELS[state.levelId] || LEVELS[0];
-      const bombCount = state.others.filter(o => o.type === 'bomb').length;
-      if (t >= state.nextBombAt && bombCount < lvl.bombsMax) {
-        spawnBomb();
-        state.nextBombAt = t + BOMB_INTERVAL_MS;
-      }
-    }
+    // Bombs removed — Iris doesn't want explodey hazards
 
     // Math timeout — faster for Genius (Mathcounts countdown pace)
     if (state.activeMath) {
@@ -1164,19 +1175,12 @@
           eatDragon(o);
           toRemove.add(o);
         } else if (o.size > player.size + EAT_BUFFER) {
-          gameOver(`A bigger ${o.character ? o.character.name : 'dragon'} ate you!`);
+          const enemyName = o.character ? o.character.name : 'dragon';
+          gameOver(`A Lv ${dragonLevel(o.size)} ${enemyName} ate you!`);
           return;
         } else {
           bounce(player, o);
         }
-      } else if (o.type === 'bomb') {
-        if (flying || invulnerable) {
-          continue;
-        }
-        bombExplode(o);
-        toRemove.add(o);
-        gameOver('💣 You hit a bomb!');
-        return;
       }
     }
 
@@ -1374,7 +1378,7 @@
 
     $('gameover-msg').textContent = reason;
     $('final-score').textContent = state.score;
-    $('final-length').textContent = Math.round(state.player.size);
+    $('final-length').textContent = dragonLevel(state.player.size);
     $('final-level').textContent = state.level;
 
     const qualifies = qualifiesForLeaderboard(state.score);
@@ -1882,7 +1886,6 @@
     else if (o.type === 'egg') drawEgg(o);
     else if (o.type === 'math') drawMathEgg(o);
     else if (o.type === 'powerup') drawPowerup(o);
-    else if (o.type === 'bomb') drawBomb(o);
   }
 
   function drawBomb(o) {
@@ -2026,19 +2029,40 @@
       drawDragonFallback(o);
     }
 
-    // Name label for enemies (only if bigger threshold so it's not cluttered)
-    if (!isPlayer && c && o.size > 28) {
-      ctx.font = `${Math.max(10, Math.min(16, o.size * 0.2))}px -apple-system, sans-serif`;
+    // Level + name label for enemies — always shown, even on small dragons,
+    // so the player can read each opponent's level at a glance
+    if (!isPlayer) {
+      const lvl = dragonLevel(o.size);
+      const labelText = c ? `Lv ${lvl} · ${c.name}` : `Lv ${lvl}`;
+      const isBigger = o.size > state.player.size + EAT_BUFFER;
+      const fontPx = Math.max(11, Math.min(18, o.size * 0.22));
+      ctx.font = `bold ${fontPx}px -apple-system, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      const isBigger = o.size > state.player.size + EAT_BUFFER;
-      ctx.fillStyle = isBigger ? '#ff3860' : '#fff4d1';
-      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-      ctx.lineWidth = 3;
-      const label = c.name;
       const ly = o.y + o.size * 0.95;
-      ctx.strokeText(label, o.x, ly);
-      ctx.fillText(label, o.x, ly);
+      // Background pill behind the label for legibility
+      const metrics = ctx.measureText(labelText);
+      const padX = 8, padY = 3;
+      const pillW = metrics.width + padX * 2;
+      const pillH = fontPx + padY * 2;
+      ctx.fillStyle = isBigger ? 'rgba(60, 10, 20, 0.85)' : 'rgba(10, 5, 25, 0.75)';
+      ctx.strokeStyle = isBigger ? '#ff3860' : (lvl >= 6 ? '#ffd54a' : 'rgba(255, 244, 209, 0.4)');
+      ctx.lineWidth = 1.5;
+      const px = o.x - pillW / 2, py = ly - 2;
+      const radius = pillH / 2;
+      ctx.beginPath();
+      ctx.moveTo(px + radius, py);
+      ctx.arcTo(px + pillW, py, px + pillW, py + pillH, radius);
+      ctx.arcTo(px + pillW, py + pillH, px, py + pillH, radius);
+      ctx.arcTo(px, py + pillH, px, py, radius);
+      ctx.arcTo(px, py, px + pillW, py, radius);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // Label text
+      ctx.fillStyle = isBigger ? '#ff8fa3' : '#fff4d1';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(labelText, o.x, py + pillH / 2);
     }
 
     if (isPlayer && state.player.hurtFlash > 0) {
@@ -2087,19 +2111,21 @@
         ctx.restore();
       }
 
-      // "YOU" arrow indicator floating above the player
-      const arrowY = o.y - o.size - 18 - Math.sin(t / 350) * 4;
+      // "YOU · Lv X" indicator floating above the player
+      const arrowY = o.y - o.size - 22 - Math.sin(t / 350) * 4;
       const arrowX = o.x;
+      const lvl = dragonLevel(o.size);
+      const youText = `YOU · Lv ${lvl}`;
       ctx.save();
-      ctx.font = `bold 14px Georgia, serif`;
+      ctx.font = `bold 15px Georgia, serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = '#1a0b2e';
       ctx.strokeStyle = '#1a0b2e';
       ctx.lineWidth = 4;
-      ctx.strokeText('YOU', arrowX, arrowY);
+      ctx.strokeText(youText, arrowX, arrowY);
       ctx.fillStyle = '#ffd54a';
-      ctx.fillText('YOU', arrowX, arrowY);
+      ctx.fillText(youText, arrowX, arrowY);
       // little down-arrow under the label
       ctx.fillStyle = '#ffd54a';
       ctx.strokeStyle = '#1a0b2e';
