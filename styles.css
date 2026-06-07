@@ -341,16 +341,36 @@ h1 .crown {
   max-width: 1100px;
   margin: 0 auto 0.5rem;
   padding: 0.8rem 1rem;
-  background: linear-gradient(135deg, rgba(178, 102, 255, 0.3), rgba(255, 213, 74, 0.25));
-  border: 2px solid var(--gold);
+  background: linear-gradient(135deg, rgba(70, 50, 110, 0.35), rgba(40, 30, 70, 0.3));
+  border: 2px solid var(--panel-border);
   border-radius: 14px;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.2rem;
+  min-height: 96px;
+  justify-content: center;
+  transition: background 0.25s, border-color 0.25s, box-shadow 0.25s;
+}
+
+.math-banner.active {
+  background: linear-gradient(135deg, rgba(178, 102, 255, 0.3), rgba(255, 213, 74, 0.25));
+  border-color: var(--gold);
   animation: math-pulse 1.5s ease-in-out infinite;
   box-shadow: 0 0 30px rgba(255, 213, 74, 0.3);
+}
+
+.math-banner:not(.active) .math-problem {
+  color: var(--muted);
+  font-size: clamp(1.05rem, 2.5vw, 1.4rem);
+  font-style: italic;
+  font-weight: 500;
+  text-shadow: none;
+}
+
+.math-banner:not(.active) .math-label {
+  color: var(--muted);
 }
 
 .math-banner-row {

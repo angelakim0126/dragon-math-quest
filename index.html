@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
   <meta name="googlebot" content="noindex, nofollow">
   <title>Iris Juliet's Dragon Math Quest</title>
-  <link rel="stylesheet" href="styles.css?v=11">
+  <link rel="stylesheet" href="styles.css?v=12">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🐉%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -75,8 +75,7 @@
           <li>🥚 <strong>Eat eggs</strong> to grow bigger and score points</li>
           <li>🐲 <strong>Eat smaller dragons</strong> — but watch out for ones bigger than you!</li>
           <li>🌀 <strong>Walls wrap around</strong> — fly off one side, come back on the other</li>
-          <li>🧠 A <strong>math problem</strong> shows up with two answer eggs. Eat the right one to LEVEL UP!</li>
-          <li>✨ <strong>Fly</strong> — phase through bigger dragons (8 seconds)</li>
+          <li>🧠 A <strong>math problem</strong> shows up with FOUR answer eggs (1 right, 3 wrong). Eat the right one to LEVEL UP!</li>
           <li>🔥 <strong>Power</strong> — eat ANY dragon, even big ones (8 seconds)</li>
           <li>⭐ <strong>Level Up</strong> — grow extra big right away</li>
         </ul>
@@ -106,12 +105,12 @@
       <button id="pause-btn" class="hud-btn" aria-label="Pause">⏸</button>
     </div>
 
-    <div id="math-banner" class="math-banner hidden">
+    <div id="math-banner" class="math-banner">
       <div class="math-banner-row">
-        <span class="math-label">Solve to level up</span>
-        <span id="math-timer" class="math-timer">22s</span>
+        <span id="math-label" class="math-label">Get ready…</span>
+        <span id="math-timer" class="math-timer"></span>
       </div>
-      <span id="math-problem" class="math-problem">7 + 8 = ?</span>
+      <span id="math-problem" class="math-problem">Math problem coming soon</span>
     </div>
 
     <div id="powerup-banner" class="powerup-banner hidden">
@@ -180,6 +179,6 @@
     </p>
   </footer>
 
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>

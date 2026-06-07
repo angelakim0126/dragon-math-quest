@@ -424,20 +424,29 @@
       }
     }
 
-    // Wrong-answer tuning — tighter for Genius so you actually have to compute
+    // Generate 3 distinct wrong answers. Tighter range for Genius.
     const wrongScale = state.difficulty === 'genius' ? 0.07 : 0.15;
-    let wrong;
+    const range = Math.max(2, Math.floor(Math.abs(answer) * wrongScale));
+    const wrongs = [];
     let attempts = 0;
-    do {
-      const range = Math.max(2, Math.floor(Math.abs(answer) * wrongScale));
-      const delta = randInt(-range - 2, range + 2) || 1;
-      wrong = answer + delta;
-      if (wrong < 0) wrong = answer + Math.abs(delta) + 1;
+    while (wrongs.length < 3 && attempts < 60) {
       attempts++;
-    } while (wrong === answer && attempts < 12);
-    if (wrong === answer) wrong = answer + 1;
+      const delta = randInt(-range - 2, range + 2) || 1;
+      let w = answer + delta;
+      if (w < 0) w = answer + Math.abs(delta) + 1;
+      if (w === answer) continue;
+      if (wrongs.includes(w)) continue;
+      wrongs.push(w);
+    }
+    // Fallback fillers if we somehow couldn't find 3 distinct wrongs
+    let bump = 1;
+    while (wrongs.length < 3) {
+      const w = answer + bump;
+      if (w !== answer && !wrongs.includes(w)) wrongs.push(w);
+      bump++;
+    }
 
-    return { problemText, answer, wrong };
+    return { problemText, answer, wrongs };
   }
 
   // ===== Canvas sizing =====
@@ -535,7 +544,7 @@
   }
 
   function spawnPowerup() {
-    const kinds = ['fly', 'power', 'levelup'];
+    const kinds = ['power', 'levelup', 'levelup']; // fly removed
     const kind = choice(kinds);
     const p = randomEmptyPosition(POWERUP_SIZE);
     state.others.push({
@@ -550,34 +559,44 @@
   function spawnMath() {
     if (state.activeMath) return;
     const mp = makeMathProblem();
-    const p1 = randomEmptyPosition(MATH_EGG_SIZE);
-    const p2 = randomEmptyPosition(MATH_EGG_SIZE);
-    const correct = {
+    const now = performance.now();
+    const eggs = [];
+
+    // Correct egg
+    const pc = randomEmptyPosition(MATH_EGG_SIZE);
+    eggs.push({
       type: 'math', value: mp.answer, correct: true,
-      x: p1.x, y: p1.y, vx: 0, vy: 0,
+      x: pc.x, y: pc.y, vx: 0, vy: 0,
       size: MATH_EGG_SIZE, seed: Math.random() * 100,
-      spawnedAt: performance.now(),
-    };
-    const wrong = {
-      type: 'math', value: mp.wrong, correct: false,
-      x: p2.x, y: p2.y, vx: 0, vy: 0,
-      size: MATH_EGG_SIZE, seed: Math.random() * 100,
-      spawnedAt: performance.now(),
-    };
-    state.others.push(correct, wrong);
-    state.activeMath = { problemText: mp.problemText, answer: mp.answer, eggs: [correct, wrong], lastTimerShown: null };
+      spawnedAt: now,
+    });
+
+    // 3 wrong eggs
+    for (const w of mp.wrongs) {
+      const pw = randomEmptyPosition(MATH_EGG_SIZE);
+      eggs.push({
+        type: 'math', value: w, correct: false,
+        x: pw.x, y: pw.y, vx: 0, vy: 0,
+        size: MATH_EGG_SIZE, seed: Math.random() * 100,
+        spawnedAt: now,
+      });
+    }
+
+    state.others.push(...eggs);
+    state.activeMath = { problemText: mp.problemText, answer: mp.answer, eggs, lastTimerShown: null };
     mathProblem.textContent = mp.problemText;
     const timeoutMs = state.difficulty === 'genius' ? MATH_ANSWER_TIMEOUT_GENIUS_MS : MATH_ANSWER_TIMEOUT_MS;
     $('math-timer').textContent = Math.ceil(timeoutMs / 1000) + 's';
     $('math-timer').classList.toggle('countdown', state.difficulty === 'genius');
-    mathBanner.classList.remove('hidden');
+    $('math-banner').classList.add('active');
   }
 
   function clearActiveMath() {
     if (!state.activeMath) return;
     state.others = state.others.filter(o => o.type !== 'math');
     state.activeMath = null;
-    mathBanner.classList.add('hidden');
+    $('math-banner').classList.remove('active');
+    state.lastNextMathShown = null;
   }
 
   // ===== Geometry =====
@@ -604,7 +623,10 @@
     state.activeMath = null;
     state.powerup = null;
     state.screenShake = 0;
-    mathBanner.classList.add('hidden');
+    $('math-banner').classList.remove('active');
+    $('math-problem').textContent = 'Math problem coming soon';
+    $('math-timer').textContent = '';
+    $('math-label').textContent = 'Get ready…';
     powerupBanner.classList.add('hidden');
 
     const char = PLAYER_CHARS[state.chosenCharIndex] || PLAYER_CHARS[0] || CHARACTERS_WITH_IMG[0];
@@ -733,8 +755,21 @@
           if (state.activeMath.lastTimerShown !== remain) {
             state.activeMath.lastTimerShown = remain;
             $('math-timer').textContent = remain + 's';
+            $('math-label').textContent = 'Solve to level up';
           }
         }
+      }
+    } else if (state.nextMathAt) {
+      // No active problem — show a countdown to the next one so the
+      // banner space is meaningful instead of just empty
+      const remain = Math.max(0, Math.ceil((state.nextMathAt - t) / 1000));
+      if (state.lastNextMathShown !== remain) {
+        state.lastNextMathShown = remain;
+        $('math-problem').textContent = remain > 0
+          ? `Next math problem in ${remain}s`
+          : `Math problem incoming!`;
+        $('math-timer').textContent = '';
+        $('math-label').textContent = 'Get ready';
       }
     }
 
