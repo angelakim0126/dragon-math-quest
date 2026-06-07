@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+  <meta name="googlebot" content="noindex, nofollow">
+  <title>Iris Juliet's Dragon Math Quest</title>
+  <link rel="stylesheet" href="styles.css?v=1">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🐉%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+
+  <!-- ===== START SCREEN ===== -->
+  <section id="start-screen" class="screen active">
+    <div class="screen-inner">
+      <p class="title-name">Iris Juliet's</p>
+      <h1>Dragon <span class="crown">✦</span> Math Quest</h1>
+      <p class="subtitle">Eat eggs. Grow bigger. Answer math. Become the biggest dragon!</p>
+
+      <div class="dragon-preview" aria-hidden="true">
+        <canvas id="preview-canvas" width="220" height="140"></canvas>
+      </div>
+
+      <div class="difficulty-picker">
+        <p class="picker-label">Choose your dragon's math level</p>
+        <div class="diff-buttons" role="radiogroup" aria-label="Difficulty">
+          <button class="diff-btn" data-diff="easy" role="radio" aria-checked="false">
+            <span class="diff-emoji">🥚</span>
+            <span class="diff-name">Easy</span>
+            <span class="diff-desc">Add &amp; subtract<br>within 10</span>
+          </button>
+          <button class="diff-btn" data-diff="medium" role="radio" aria-checked="false">
+            <span class="diff-emoji">🐲</span>
+            <span class="diff-name">Medium</span>
+            <span class="diff-desc">Add &amp; subtract<br>within 20</span>
+          </button>
+          <button class="diff-btn selected" data-diff="hard" role="radio" aria-checked="true">
+            <span class="diff-emoji">🔥</span>
+            <span class="diff-name">Hard</span>
+            <span class="diff-desc">Within 100<br>+ times tables</span>
+          </button>
+        </div>
+      </div>
+
+      <button id="start-btn" class="big-btn">Start Adventure ✦</button>
+
+      <details class="how-to-play">
+        <summary>How to play</summary>
+        <ul>
+          <li>🎮 <strong>Move</strong> with arrow keys, WASD, or swipe on iPad</li>
+          <li>🥚 <strong>Eat eggs</strong> to grow bigger and score points</li>
+          <li>🐲 <strong>Eat smaller dragons</strong> for bonus points</li>
+          <li>😱 <strong>Run from big dragons</strong> — they will eat you!</li>
+          <li>🧠 <strong>Math problem</strong> shows up — eat the <em>right answer</em> to LEVEL UP</li>
+          <li>✨ <strong>Fly</strong> power-up = phase through big dragons</li>
+          <li>🔥 <strong>Power</strong> power-up = eat big dragons too!</li>
+          <li>⭐ <strong>Level Up</strong> power-up = grow extra big</li>
+        </ul>
+      </details>
+    </div>
+  </section>
+
+  <!-- ===== GAME SCREEN ===== -->
+  <section id="game-screen" class="screen">
+    <div class="hud">
+      <div class="hud-item">
+        <span class="hud-label">Score</span>
+        <span id="hud-score" class="hud-value">0</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">Length</span>
+        <span id="hud-length" class="hud-value">3</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">Level</span>
+        <span id="hud-level" class="hud-value">1</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">Best</span>
+        <span id="hud-best" class="hud-value">0</span>
+      </div>
+      <button id="pause-btn" class="hud-btn" aria-label="Pause">⏸</button>
+    </div>
+
+    <div id="math-banner" class="math-banner hidden">
+      <span class="math-label">Solve to level up</span>
+      <span id="math-problem" class="math-problem">7 + 8 = ?</span>
+    </div>
+
+    <div id="powerup-banner" class="powerup-banner hidden">
+      <span id="powerup-icon" class="pu-icon">✨</span>
+      <span id="powerup-text" class="pu-text">FLY MODE</span>
+      <span id="powerup-timer" class="pu-timer">8</span>
+    </div>
+
+    <div class="canvas-wrap">
+      <canvas id="game-canvas"></canvas>
+    </div>
+
+    <div class="controls-hint">
+      <p>Use <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> or swipe</p>
+    </div>
+  </section>
+
+  <!-- ===== PAUSE SCREEN ===== -->
+  <section id="pause-screen" class="screen overlay">
+    <div class="screen-inner">
+      <h2>Paused</h2>
+      <button id="resume-btn" class="big-btn">Resume</button>
+      <button id="quit-btn" class="text-btn">Back to start</button>
+    </div>
+  </section>
+
+  <!-- ===== GAME OVER SCREEN ===== -->
+  <section id="gameover-screen" class="screen overlay">
+    <div class="screen-inner">
+      <h2 id="gameover-title">Oh no!</h2>
+      <p id="gameover-msg" class="gameover-msg">A bigger dragon got you!</p>
+
+      <div class="final-stats">
+        <div class="stat"><span class="stat-label">Score</span><span id="final-score" class="stat-val">0</span></div>
+        <div class="stat"><span class="stat-label">Length</span><span id="final-length" class="stat-val">3</span></div>
+        <div class="stat"><span class="stat-label">Level</span><span id="final-level" class="stat-val">1</span></div>
+        <div class="stat best-stat"><span class="stat-label">Best</span><span id="final-best" class="stat-val">0</span></div>
+      </div>
+
+      <p id="new-best" class="new-best hidden">🏆 NEW HIGH SCORE!</p>
+
+      <button id="play-again-btn" class="big-btn">Play Again ✦</button>
+      <button id="home-btn" class="text-btn">Back to start</button>
+    </div>
+  </section>
+
+  <footer class="page-footer">
+    <p class="dedication">
+      Made with love for our brave dragon-rider, <span>Iris Juliet</span> 🐉
+    </p>
+    <p class="disclaimer">
+      A personal, non-commercial fan project. Wings of Fire is © Tui T. Sutherland and Scholastic Inc.
+      Not affiliated with Scholastic.
+    </p>
+  </footer>
+
+  <script src="app.js?v=1"></script>
+</body>
+</html>
