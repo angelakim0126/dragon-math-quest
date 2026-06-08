@@ -170,7 +170,7 @@
   // Loaded from characters.json (curated copy from the coloring guide).
   let CHARACTERS = [];
   let CHARACTERS_WITH_IMG = [];
-  const PLAYER_CHARS_NAMES = ['Clay', 'Tsunami', 'Glory', 'Starflight', 'Sunny', 'Peril', 'Moonwatcher', 'Qibli'];
+  const PLAYER_CHARS_NAMES = ['Isa', 'Clay', 'Tsunami', 'Glory', 'Starflight', 'Sunny', 'Peril', 'Moonwatcher'];
   let PLAYER_CHARS = [];
   const imgCache = new Map();
 
@@ -706,7 +706,14 @@
 
   function spawnDragon(forceSize = null) {
     if (CHARACTERS.length === 0) return;
-    const character = choice(CHARACTERS_WITH_IMG.length > 0 ? CHARACTERS_WITH_IMG : CHARACTERS);
+    // 12% of spawns are Isa (Iris's own dragon) — give her frequent cameos
+    let character;
+    const isa = CHARACTERS.find(c => c.name === 'Isa');
+    if (isa && Math.random() < 0.12) {
+      character = isa;
+    } else {
+      character = choice(CHARACTERS_WITH_IMG.length > 0 ? CHARACTERS_WITH_IMG : CHARACTERS);
+    }
     const playerSize = state.player ? state.player.size : PLAYER_START_SIZE;
     const inGrace = state.graceUntil && performance.now() < state.graceUntil;
     let size;
