@@ -32,7 +32,7 @@
   const MATH_FIRST_DELAY_MS = 7000;
   const MATH_INTERVAL_MS = 14000;
   const MATH_ANSWER_TIMEOUT_MS = 22000;
-  const MATH_ANSWER_TIMEOUT_GENIUS_MS = 12000; // countdown round pace
+  const MATH_ANSWER_TIMEOUT_GENIUS_MS = 25000; // AMC/Mathcounts need real thinking time
   const POWERUP_INTERVAL_MS = 16000;
   const POWERUP_DURATION_MS = 8000;
   const GRACE_PERIOD_MS = 8000; // no big dragons / bombs until this elapses
@@ -1110,7 +1110,11 @@
     if (state.keys.has('ArrowLeft') || state.keys.has('a') || state.keys.has('A')) tx -= 1;
     if (state.keys.has('ArrowRight') || state.keys.has('d') || state.keys.has('D')) tx += 1;
 
-    if (state.touch) {
+    // Virtual joystick takes priority on touch devices
+    if (state.joyDir) {
+      tx = state.joyDir.x;
+      ty = state.joyDir.y;
+    } else if (state.touch) {
       const dx = state.touch.x - p.x;
       const dy = state.touch.y - p.y;
       const d = Math.sqrt(dx * dx + dy * dy);
@@ -1122,7 +1126,7 @@
       }
     }
 
-    if (tx !== 0 && ty !== 0) {
+    if (tx !== 0 && ty !== 0 && !state.joyDir) {
       const inv = 1 / Math.sqrt(2);
       tx *= inv; ty *= inv;
     }
@@ -3216,6 +3220,87 @@
     ev.preventDefault();
   }, { passive: false });
   canvas.addEventListener('touchend', () => { state.touch = null; });
+
+  // ===== Virtual joystick (iPad-friendly) =====
+  (() => {
+    const joy = $('joystick');
+    if (!joy) return;
+    const stick = joy.querySelector('.joystick-stick');
+    let joyTouchId = null;
+    let center = null;
+
+    function rect() { return joy.getBoundingClientRect(); }
+    function startJoy(t) {
+      joyTouchId = t.identifier;
+      const r = rect();
+      center = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      updateJoy(t);
+    }
+    function updateJoy(t) {
+      const dx = t.clientX - center.x;
+      const dy = t.clientY - center.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const r = rect();
+      const maxR = r.width / 2 - 14;
+      const clamped = Math.min(dist, maxR);
+      const ang = dist === 0 ? 0 : Math.atan2(dy, dx);
+      const sx = Math.cos(ang) * clamped;
+      const sy = Math.sin(ang) * clamped;
+      stick.style.transform = `translate(${sx}px, ${sy}px)`;
+      if (dist > 8) {
+        state.joyDir = { x: dx / dist, y: dy / dist };
+      } else {
+        state.joyDir = null;
+      }
+    }
+    function endJoy() {
+      joyTouchId = null;
+      state.joyDir = null;
+      stick.style.transform = '';
+    }
+
+    joy.addEventListener('touchstart', (ev) => {
+      if (joyTouchId !== null) return;
+      startJoy(ev.changedTouches[0]);
+      ev.preventDefault();
+    }, { passive: false });
+
+    joy.addEventListener('touchmove', (ev) => {
+      for (const t of ev.changedTouches) {
+        if (t.identifier === joyTouchId) {
+          updateJoy(t);
+          ev.preventDefault();
+          break;
+        }
+      }
+    }, { passive: false });
+
+    joy.addEventListener('touchend', (ev) => {
+      for (const t of ev.changedTouches) {
+        if (t.identifier === joyTouchId) { endJoy(); break; }
+      }
+    });
+    joy.addEventListener('touchcancel', endJoy);
+
+    // Mouse support for testing on desktop too (only if explicitly clicked on joystick)
+    let mouseJoying = false;
+    joy.addEventListener('mousedown', (ev) => {
+      mouseJoying = true;
+      const r = rect();
+      center = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      updateJoy({ clientX: ev.clientX, clientY: ev.clientY });
+      ev.preventDefault();
+    });
+    window.addEventListener('mousemove', (ev) => {
+      if (!mouseJoying) return;
+      updateJoy({ clientX: ev.clientX, clientY: ev.clientY });
+    });
+    window.addEventListener('mouseup', () => {
+      if (!mouseJoying) return;
+      mouseJoying = false;
+      endJoy();
+    });
+  })();
 
   function togglePause() {
     if (!state.running) return;
